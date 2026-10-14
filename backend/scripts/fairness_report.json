@@ -1,0 +1,50 @@
+{
+  "status": "COMPLETED",
+  "overall_metrics": {
+    "total_test_samples": 12,
+    "overall_severity_accuracy": 0.25,
+    "overall_ambulance_accuracy": 0.6667,
+    "overall_location_extraction_rate": 0.5,
+    "evaluation_duration_seconds": 0.0
+  },
+  "language_breakdown": {
+    "English": {
+      "total_cases": 3,
+      "severity_accuracy": 0.3333,
+      "ambulance_accuracy": 0.6667,
+      "location_extraction_rate": 1.0,
+      "avg_latency_ms": 0.0,
+      "false_positives": 0,
+      "false_negatives": 0
+    },
+    "Hindi": {
+      "total_cases": 3,
+      "severity_accuracy": 0.0,
+      "ambulance_accuracy": 0.6667,
+      "location_extraction_rate": 0.3333,
+      "avg_latency_ms": 0.0,
+      "false_positives": 0,
+      "false_negatives": 0
+    },
+    "Marathi": {
+      "total_cases": 3,
+      "severity_accuracy": 0.0,
+      "ambulance_accuracy": 0.6667,
+      "location_extraction_rate": 0.3333,
+      "avg_latency_ms": 0.0,
+      "false_positives": 0,
+      "false_negatives": 0
+    },
+    "Code-Mixed": {
+      "total_cases": 3,
+      "severity_accuracy": 0.6667,
+      "ambulance_accuracy": 0.6667,
+      "location_extraction_rate": 0.3333,
+      "avg_latency_ms": 0.0,
+      "false_positives": 0,
+      "false_negatives": 0
+    }
+  },
+  "max_severity_disparity": 0.6667,
+  "disparity_flagged": true
+}
