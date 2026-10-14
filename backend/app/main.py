@@ -55,14 +55,26 @@ def create_application() -> FastAPI:
     # 4. Versioned API Router: /api/v1/...
     app.include_router(api_router, prefix=settings.API_V1_STR)
 
-    # 5. Static Files & Dispatcher Dashboard UI
+    # 5. Static Files & Multi-Role Page Routing
     import os
     from fastapi import Request, Response
     from fastapi.staticfiles import StaticFiles
-    from fastapi.responses import FileResponse
+    from fastapi.responses import FileResponse, RedirectResponse
 
     static_dir = os.path.join(os.path.dirname(__file__), "static")
-    index_html = os.path.join(static_dir, "index.html")
+    citizen_index_html = os.path.join(static_dir, "index.html")
+    citizen_track_html = os.path.join(static_dir, "citizen", "case-status.html")
+    staff_login_html = os.path.join(static_dir, "staff", "login.html")
+    staff_dashboard_html = os.path.join(static_dir, "staff", "dashboard.html")
+    staff_cases_html = os.path.join(static_dir, "staff", "cases.html")
+    staff_case_details_html = os.path.join(static_dir, "staff", "case-details.html")
+    staff_review_html = os.path.join(static_dir, "staff", "review.html")
+    staff_ambulances_html = os.path.join(static_dir, "staff", "ambulances.html")
+    staff_hospitals_html = os.path.join(static_dir, "staff", "hospitals.html")
+    staff_map_html = os.path.join(static_dir, "staff", "map.html")
+    staff_sla_html = os.path.join(static_dir, "staff", "sla.html")
+    staff_audit_html = os.path.join(static_dir, "staff", "audit.html")
+    staff_fairness_html = os.path.join(static_dir, "staff", "fairness.html")
 
     if os.path.exists(static_dir):
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -71,48 +83,122 @@ def create_application() -> FastAPI:
     def favicon():
         return Response(status_code=204)
 
-    @app.get("/login", tags=["Dashboard"])
-    @app.get("/dashboard", tags=["Dashboard"])
-    def serve_dashboard():
-        if os.path.exists(index_html):
-            return FileResponse(index_html)
-        return {"name": settings.PROJECT_NAME, "message": "Dashboard UI not found."}
-
-    # 6. Root web interface & API metadata
-    @app.get("/", tags=["Dashboard", "Root"])
+    # ── PUBLIC CITIZEN ROUTES ──────────────────────────────────
+    @app.get("/", tags=["Citizen Portal", "Root"])
     def root(request: Request):
         format_param = request.query_params.get("format", "")
         accept = request.headers.get("accept", "")
-        # If client explicitly requests json via format query param or specific Accept header without HTML:
         if format_param == "json" or ("application/json" in accept and "text/html" not in accept and "*/*" not in accept):
             return {
                 "name": settings.PROJECT_NAME,
                 "version": settings.PROJECT_VERSION,
                 "docs": "/docs",
-                "dashboard": "/dashboard",
+                "dashboard": "/staff/dashboard",
                 "health": "/health",
                 "api_v1": settings.API_V1_STR,
             }
-        # Default: open the main SahayAI Emergency web interface/dashboard
-        if os.path.exists(index_html):
-            return FileResponse(index_html)
-        return {
-            "name": settings.PROJECT_NAME,
-            "version": settings.PROJECT_VERSION,
-            "docs": "/docs",
-            "dashboard": "/dashboard",
-            "health": "/health",
-            "api_v1": settings.API_V1_STR,
-        }
+        if os.path.exists(citizen_index_html):
+            return FileResponse(citizen_index_html)
+        return {"name": settings.PROJECT_NAME, "message": "Citizen Portal UI not found."}
 
-    # 7. Dedicated API metadata endpoint
+    @app.get("/emergency", tags=["Citizen Portal"])
+    def citizen_emergency_portal():
+        if os.path.exists(citizen_index_html):
+            return FileResponse(citizen_index_html)
+        return {"name": settings.PROJECT_NAME, "message": "Emergency portal UI not found."}
+
+    @app.get("/track", tags=["Citizen Portal"])
+    @app.get("/track/{case_id}", tags=["Citizen Portal"])
+    @app.get("/citizen/status", tags=["Citizen Portal"])
+    def citizen_case_tracker(case_id: str = None):
+        if os.path.exists(citizen_track_html):
+            return FileResponse(citizen_track_html)
+        return {"name": settings.PROJECT_NAME, "message": "Citizen tracking UI not found."}
+
+    # ── STAFF DISPATCHER & ADMIN ROUTES ────────────────────────
+    @app.get("/staff/login", tags=["Staff Operations"])
+    def staff_login_view():
+        if os.path.exists(staff_login_html):
+            return FileResponse(staff_login_html)
+        return {"name": settings.PROJECT_NAME, "message": "Staff login UI not found."}
+
+    @app.get("/staff/dashboard", tags=["Staff Operations"])
+    def staff_dashboard_view():
+        if os.path.exists(staff_dashboard_html):
+            return FileResponse(staff_dashboard_html)
+        return {"name": settings.PROJECT_NAME, "message": "Staff dashboard UI not found."}
+
+    @app.get("/staff/cases", tags=["Staff Operations"])
+    def staff_cases_view():
+        if os.path.exists(staff_cases_html):
+            return FileResponse(staff_cases_html)
+        return {"name": settings.PROJECT_NAME, "message": "Staff cases UI not found."}
+
+    @app.get("/staff/cases/{case_id}", tags=["Staff Operations"])
+    def staff_case_detail_view(case_id: str):
+        if os.path.exists(staff_case_details_html):
+            return FileResponse(staff_case_details_html)
+        return {"name": settings.PROJECT_NAME, "message": "Staff case detail UI not found."}
+
+    @app.get("/staff/review", tags=["Staff Operations"])
+    def staff_review_view():
+        if os.path.exists(staff_review_html):
+            return FileResponse(staff_review_html)
+        return {"name": settings.PROJECT_NAME, "message": "Staff review UI not found."}
+
+    @app.get("/staff/ambulances", tags=["Staff Operations"])
+    def staff_ambulances_view():
+        if os.path.exists(staff_ambulances_html):
+            return FileResponse(staff_ambulances_html)
+        return {"name": settings.PROJECT_NAME, "message": "Staff ambulances UI not found."}
+
+    @app.get("/staff/hospitals", tags=["Staff Operations"])
+    def staff_hospitals_view():
+        if os.path.exists(staff_hospitals_html):
+            return FileResponse(staff_hospitals_html)
+        return {"name": settings.PROJECT_NAME, "message": "Staff hospitals UI not found."}
+
+    @app.get("/staff/map", tags=["Staff Operations"])
+    def staff_map_view():
+        if os.path.exists(staff_map_html):
+            return FileResponse(staff_map_html)
+        return {"name": settings.PROJECT_NAME, "message": "Staff map UI not found."}
+
+    @app.get("/staff/sla", tags=["Staff Operations"])
+    def staff_sla_view():
+        if os.path.exists(staff_sla_html):
+            return FileResponse(staff_sla_html)
+        return {"name": settings.PROJECT_NAME, "message": "Staff SLA UI not found."}
+
+    @app.get("/staff/audit", tags=["Staff Operations"])
+    def staff_audit_view():
+        if os.path.exists(staff_audit_html):
+            return FileResponse(staff_audit_html)
+        return {"name": settings.PROJECT_NAME, "message": "Staff audit UI not found."}
+
+    @app.get("/staff/fairness", tags=["Staff Operations"])
+    def staff_fairness_view():
+        if os.path.exists(staff_fairness_html):
+            return FileResponse(staff_fairness_html)
+        return {"name": settings.PROJECT_NAME, "message": "Staff fairness UI not found."}
+
+    # ── CONVENIENCE REDIRECTS ──────────────────────────────────
+    @app.get("/login", include_in_schema=False)
+    def redirect_login():
+        return RedirectResponse(url="/staff/login", status_code=302)
+
+    @app.get("/dashboard", include_in_schema=False)
+    def redirect_dashboard():
+        return RedirectResponse(url="/staff/dashboard", status_code=302)
+
+    # ── DEDICATED API ROOT METADATA ────────────────────────────
     @app.get("/api", tags=["Root"])
     def api_root():
         return {
             "name": settings.PROJECT_NAME,
             "version": settings.PROJECT_VERSION,
             "docs": "/docs",
-            "dashboard": "/dashboard",
+            "dashboard": "/staff/dashboard",
             "health": "/health",
             "api_v1": settings.API_V1_STR,
         }

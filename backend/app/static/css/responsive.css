@@ -1,0 +1,91 @@
+/* ============================================================
+   SahayAI Design System — Responsive Breakpoints
+   ============================================================ */
+
+/* Tablet (1024px and below) */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-w: 220px;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .map-layout-wrap {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .map-viewport {
+    height: 480px;
+  }
+}
+
+/* Mobile & Small Tablets (768px and below) */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.7);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .top-bar {
+    padding: 0 16px;
+  }
+
+  .content-area {
+    padding: 16px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .citizen-hero-title {
+    font-size: 1.6rem;
+  }
+
+  .citizen-main {
+    padding: 20px 14px 40px;
+  }
+
+  .track-resource-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modality-toggle {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Small Mobile (480px and below) */
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .btn {
+    width: 100%;
+  }
+
+  .top-bar-actions {
+    gap: 6px;
+  }
+
+  .hotline-bar {
+    flex-direction: column;
+    text-align: center;
+  }
+}

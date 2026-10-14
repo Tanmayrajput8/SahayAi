@@ -32,4 +32,6 @@ dist/
 .vscode/
 .idea/
 .DS_Store
-Thumbs.db
+# Media & Audio Storage
+backend/storage/audio/*.wav
+storage/audio/*.wav

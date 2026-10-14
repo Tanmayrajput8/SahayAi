@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SahayAI Human-in-the-Loop Review Queue — Dispatcher Intervention">
+  <title>SahayAI — Review Queue | Dispatch Operations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/layout.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/staff.css">
+  <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <aside class="sidebar" id="staffSidebar"></aside>
+
+    <div class="main-wrapper">
+      <header class="top-bar">
+        <div class="top-bar-title">
+          <span>🧑‍⚕️</span>
+          <span>Human-in-the-Loop Review Queue</span>
+        </div>
+
+        <div class="top-bar-actions">
+          <button class="btn btn-outline btn-sm" id="btnRefreshReview">🔄 Refresh Queue</button>
+          <a href="/staff/dashboard" class="btn btn-outline btn-sm">← Back to Dashboard</a>
+        </div>
+      </header>
+
+      <main class="content-area">
+
+        <!-- Top Overview Card -->
+        <div class="card" style="margin-bottom:20px; padding:16px 20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <div style="font-weight:700; font-size:1rem; color:var(--text-primary);" id="reviewQueueCount">
+                Loading review queue…
+              </div>
+              <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:2px;">
+                Cases automatically flagged due to confidence below 75%, contradictory caller narrative, ambiguous location, or duplicate detection.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Review Queue Table Card -->
+        <div class="card">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Case ID</th>
+                  <th>Received</th>
+                  <th>Condition</th>
+                  <th>Priority</th>
+                  <th>Caller Narrative</th>
+                  <th>Flagged Reason</th>
+                  <th>Confidence</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="reviewTableBody">
+                <tr>
+                  <td colspan="8" style="text-align:center; padding:32px;">
+                    <span class="spinner"></span>
+                    <div style="margin-top:8px; color:var(--text-muted);">Loading pending review cases…</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Review Modal -->
+  <div class="modal-overlay" id="reviewModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 style="margin:0; font-size:1.1rem; display:flex; align-items:center; gap:8px;">
+          <span>🧑‍⚕️</span> <span>Intervene on Case</span>
+        </h4>
+        <button class="btn btn-outline btn-sm" id="btnCloseReviewModal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="background:#090e1b; border:1px solid var(--border-color); padding:10px 14px; border-radius:var(--radius-md); margin-bottom:16px; font-size:0.82rem;">
+          Target Case: <strong id="modalCaseIdLabel" style="font-family:var(--font-mono); color:var(--accent-cyan);"></strong>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reviewActionSelect">Intervention Action</label>
+          <select id="reviewActionSelect" class="form-control">
+            <option value="APPROVE">APPROVE (Accept AI clinical assessment)</option>
+            <option value="MODIFY">MODIFY (Override clinical priority or ambulance tier)</option>
+            <option value="REJECT">REJECT (Dismiss case as invalid or test)</option>
+            <option value="CONFIRM_DUPLICATE">CONFIRM DUPLICATE (Link to existing incident)</option>
+          </select>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label" for="reviewModSeverity">Override Severity Priority</label>
+            <select id="reviewModSeverity" class="form-control">
+              <option value="">Keep Original Assessment</option>
+              <option value="CRITICAL">CRITICAL</option>
+              <option value="HIGH">HIGH</option>
+              <option value="MODERATE">MODERATE</option>
+              <option value="LOW">LOW</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="reviewModAmbulance">Override Ambulance Tier</label>
+            <select id="reviewModAmbulance" class="form-control">
+              <option value="">Keep Original Assessment</option>
+              <option value="ALS">Advanced Life Support (ALS)</option>
+              <option value="BLS">Basic Life Support (BLS)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reviewNotes">Dispatcher Operational Notes</label>
+          <textarea id="reviewNotes" class="form-control" rows="3" placeholder="Clinical justification or notes for the audit trail…"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeReviewModal()">Cancel</button>
+        <button class="btn btn-amber" id="btnSubmitReviewAction">Record Review Decision</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/core/api.js"></script>
+  <script src="/static/js/core/auth.js"></script>
+  <script src="/static/js/core/utils.js"></script>
+  <script src="/static/js/staff/review.js"></script>
+</body>
+</html>

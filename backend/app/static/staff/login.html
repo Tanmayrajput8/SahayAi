@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SahayAI Staff & Dispatcher Login — Secure Authentication Portal">
+  <title>SahayAI — Staff Login | Dispatch Operations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/layout.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/staff.css">
+  <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body class="login-wrap">
+
+  <div class="login-card">
+    <div class="login-header">
+      <div class="logo-badge">🚨</div>
+      <h2>SahayAI Operations</h2>
+      <p>Dispatcher &amp; Administrative Command Portal</p>
+    </div>
+
+    <!-- Error Banner -->
+    <div id="loginErrorBanner" class="alert alert-danger" style="display:none;"></div>
+
+    <form id="staffLoginForm">
+      <div class="form-group">
+        <label class="form-label" for="loginUsername">Staff Username</label>
+        <input type="text" id="loginUsername" class="form-control" placeholder="e.g. dispatcher1" required autocomplete="username">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:0.82rem; color:var(--text-secondary); cursor:pointer;">
+          <input type="checkbox" id="rememberMe" checked> Remember session
+        </label>
+        <a href="/" style="font-size:0.82rem;">← Citizen Portal</a>
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="btnLoginSubmit" style="width:100%;">
+        🔐 Authenticate &amp; Access Dashboard
+      </button>
+    </form>
+
+    <!-- Demo Fast-Fill Box -->
+    <div class="demo-credentials-box">
+      <div style="font-weight:700; color:var(--text-primary); margin-bottom:6px;">Demo Roles (Click to fill):</div>
+      <div>
+        <span class="demo-user-pill" onclick="fillLogin('dispatcher1', 'dispatcher123')">dispatcher1 / dispatcher123</span>
+        <span class="demo-user-pill" onclick="fillLogin('supervisor1', 'supervisor123')">supervisor1 / supervisor123</span>
+        <span class="demo-user-pill" onclick="fillLogin('admin', 'admin123')">admin / admin123</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/core/api.js"></script>
+  <script src="/static/js/core/auth.js"></script>
+  <script src="/static/js/core/utils.js"></script>
+  <script>
+    function fillLogin(u, p) {
+      document.getElementById('loginUsername').value = u;
+      document.getElementById('loginPassword').value = p;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // If already authenticated, redirect to dashboard
+      if (Auth.isAuthenticated()) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirect = urlParams.get('redirect') || '/staff/dashboard';
+        window.location.href = redirect;
+        return;
+      }
+
+      const form = document.getElementById('staffLoginForm');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btnLoginSubmit');
+        const errBanner = document.getElementById('loginErrorBanner');
+        errBanner.style.display = 'none';
+
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const remember = document.getElementById('rememberMe').checked;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Verifying credentials…';
+
+        try {
+          const res = await window.api.login(username, password);
+          Auth.setToken(res.access_token, remember);
+          Auth.setUser(res.user || { username: res.username, role: res.role }, remember);
+
+          Utils.showToast(`Welcome back, ${res.username}!`, 'success');
+
+          const urlParams = new URLSearchParams(window.location.search);
+          const redirect = urlParams.get('redirect') || '/staff/dashboard';
+          setTimeout(() => {
+            window.location.href = redirect;
+          }, 400);
+        } catch (err) {
+          errBanner.textContent = '⚠️ ' + (err.message || 'Invalid username or password.');
+          errBanner.style.display = 'block';
+          btn.disabled = false;
+          btn.innerHTML = '🔐 Authenticate & Access Dashboard';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

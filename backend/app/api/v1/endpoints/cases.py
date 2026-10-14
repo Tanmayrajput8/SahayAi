@@ -89,6 +89,7 @@ def create_case(
     if (payload.latitude is not None and payload.longitude is not None) or payload.manual_location:
         has_gps = payload.latitude is not None and payload.longitude is not None
         initial_loc = Location(
+            case=new_case,
             case_id=new_case.id,
             raw_query=payload.manual_location or f"GPS Coordinates ({payload.latitude:.4f}, {payload.longitude:.4f})",
             formatted_address=payload.manual_location,
@@ -99,6 +100,7 @@ def create_case(
             is_verified=has_gps,
             geocoding_provider="device_gps" if has_gps else "caller_input",
         )
+        new_case.location = initial_loc
         db.add(initial_loc)
 
     # 3. Immutable audit trail for intake

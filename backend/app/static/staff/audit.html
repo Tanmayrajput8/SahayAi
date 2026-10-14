@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SahayAI Immutable Audit Logging & Provenance Trail">
+  <title>SahayAI — Audit Trail | Dispatch Operations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/layout.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/staff.css">
+  <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <aside class="sidebar" id="staffSidebar"></aside>
+
+    <div class="main-wrapper">
+      <header class="top-bar">
+        <div class="top-bar-title">
+          <span>📜</span>
+          <span>Immutable Audit Logging &amp; Event Provenance</span>
+        </div>
+
+        <div class="top-bar-actions">
+          <button class="btn btn-outline btn-sm" id="btnRefreshAudit">🔄 Refresh Logs</button>
+        </div>
+      </header>
+
+      <main class="content-area">
+
+        <!-- Filters Bar -->
+        <div class="card" style="margin-bottom:20px; padding:16px 20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+              <div>
+                <input type="text" id="searchAuditQuery" class="form-control" placeholder="Search by case ID, action, or actor…" style="padding:8px 12px; font-size:0.85rem; width:260px;">
+              </div>
+
+              <div>
+                <select id="filterAuditStage" class="form-control" style="padding:8px 12px; font-size:0.85rem;">
+                  <option value="">All Pipeline Stages</option>
+                  <option value="intake">INTAKE</option>
+                  <option value="geocoding">GEOCODING</option>
+                  <option value="triage">TRIAGE</option>
+                  <option value="rag_verification">RAG VERIFICATION</option>
+                  <option value="duplicate_check">DUPLICATE CHECK</option>
+                  <option value="confidence_eval">CONFIDENCE EVAL</option>
+                  <option value="human_review">HUMAN REVIEW</option>
+                  <option value="resource_matching">RESOURCE MATCHING</option>
+                  <option value="dispatch">DISPATCH</option>
+                  <option value="sla_check">SLA CHECK</option>
+                  <option value="escalation">ESCALATION</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="auditCountLabel" style="font-weight:600; color:var(--text-secondary); font-size:0.82rem;">
+              Loading audit trail…
+            </div>
+          </div>
+        </div>
+
+        <!-- Audit Table Card -->
+        <div class="card">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Case ID</th>
+                  <th>Pipeline Stage</th>
+                  <th>Action Triggered</th>
+                  <th>Actor / System</th>
+                  <th>Latency</th>
+                  <th>Payload Provenance</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody">
+                <tr>
+                  <td colspan="7" style="text-align:center; padding:32px;">
+                    <span class="spinner"></span>
+                    <div style="margin-top:8px; color:var(--text-muted);">Loading audit trail…</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/static/js/core/api.js"></script>
+  <script src="/static/js/core/auth.js"></script>
+  <script src="/static/js/core/utils.js"></script>
+  <script src="/static/js/staff/audit.js"></script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+/* ============================================================
+   SahayAI Design System — Citizen Experience Styles
+   ============================================================ */
+
+/* Hero Banner */
+.citizen-hero {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.citizen-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.citizen-hero-title {
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.citizen-hero-desc {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Emergency Hotline Quick Bar */
+.hotline-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px dashed rgba(239, 68, 68, 0.3);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+  font-size: 0.88rem;
+  flex-wrap: wrap;
+}
+.hotline-bar strong {
+  color: var(--accent-red);
+}
+.hotline-bar a {
+  color: #fca5a5;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* Symptom Quick Chips */
+.symptom-chips-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.symptom-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.symptom-chip {
+  background: #0d1526;
+  border: 1px solid var(--border-color);
+  padding: 7px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.symptom-chip:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+.symptom-chip.active {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--accent-red);
+  color: #fca5a5;
+  font-weight: 600;
+}
+
+/* Modality Buttons */
+.modality-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.modality-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: #090e1b;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.modality-tab:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+.modality-tab.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--accent-blue);
+  color: #93c5fd;
+}
+
+/* Voice Recorder Area */
+.audio-recorder-box {
+  background: #090e1b;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 16px;
+  transition: border-color 0.2s ease;
+}
+.audio-recorder-box.recording {
+  border-color: var(--accent-red);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.mic-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--accent-red);
+  color: white;
+  border: none;
+  font-size: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+  transition: all 0.2s ease;
+  margin-bottom: 12px;
+}
+.mic-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.7);
+}
+.mic-btn.active-record {
+  animation: pulseGlow 1.2s infinite;
+  background: #dc2626;
+}
+
+/* Citizen Case Tracking View */
+.track-hero {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.track-hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 4px;
+  background: linear-gradient(90deg, #10b981, #06b6d4, #3b82f6);
+}
+
+.track-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.track-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.track-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.track-card {
+  background: #090e1b;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.track-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.eta-callout {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--accent-emerald);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.eta-callout span {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.first-aid-box {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.first-aid-box h4 {
+  color: #6ee7b7;
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.first-aid-box p {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+#citizenMap {
+  height: 280px;
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  margin-top: 14px;
+}

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SahayAI Fleet Management — Pune Ambulance Fleet">
+  <title>SahayAI — Ambulance Fleet | Dispatch Operations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/layout.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/staff.css">
+  <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <aside class="sidebar" id="staffSidebar"></aside>
+
+    <div class="main-wrapper">
+      <header class="top-bar">
+        <div class="top-bar-title">
+          <span>🚑</span>
+          <span>Pune Ambulance Fleet Management</span>
+        </div>
+
+        <div class="top-bar-actions">
+          <button class="btn btn-outline btn-sm" id="btnRefreshAmbulances">🔄 Refresh Fleet</button>
+          <a href="/staff/map" class="btn btn-outline btn-sm">🗺️ Live Fleet Map</a>
+        </div>
+      </header>
+
+      <main class="content-area">
+
+        <!-- Filter Header -->
+        <div class="card" style="margin-bottom:20px; padding:16px 20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+              <div>
+                <select id="filterAmbType" class="form-control" style="padding:8px 12px; font-size:0.85rem;">
+                  <option value="">All Ambulance Tiers</option>
+                  <option value="ALS">Advanced Life Support (ALS)</option>
+                  <option value="BLS">Basic Life Support (BLS)</option>
+                </select>
+              </div>
+
+              <div>
+                <select id="filterAmbStatus" class="form-control" style="padding:8px 12px; font-size:0.85rem;">
+                  <option value="">All Fleet Statuses</option>
+                  <option value="AVAILABLE">AVAILABLE</option>
+                  <option value="ASSIGNED">ASSIGNED</option>
+                  <option value="DISPATCHED">DISPATCHED</option>
+                  <option value="BUSY">BUSY</option>
+                  <option value="MAINTENANCE">MAINTENANCE</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="fleetStatsLabel" style="font-weight:700; color:var(--accent-emerald); font-size:0.86rem;">
+              Loading fleet stats…
+            </div>
+          </div>
+        </div>
+
+        <!-- Ambulance Cards Grid -->
+        <div id="ambulancesGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px;"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/static/js/core/api.js"></script>
+  <script src="/static/js/core/auth.js"></script>
+  <script src="/static/js/core/utils.js"></script>
+  <script src="/static/js/staff/ambulances.js"></script>
+</body>
+</html>

@@ -40,10 +40,13 @@ def process_case_geocoding(
 
     # 1. Handle Missing / Omitted Location
     if not clean_query:
-        loc = case.location
+        loc = case.location or db.query(Location).filter(Location.case_id == case.id).first()
         if not loc:
-            loc = Location(case_id=case.id, raw_query="[Location Not Mentioned]")
+            loc = Location(case=case, case_id=case.id, raw_query="[Location Not Mentioned]")
+            case.location = loc
             db.add(loc)
+        else:
+            case.location = loc
 
         loc.raw_query = "[Location Not Mentioned]"
         loc.latitude = None
@@ -73,10 +76,13 @@ def process_case_geocoding(
     result: GeocodingResult = provider.geocode(clean_query)
 
     # 3. Update or Create Location Record
-    loc = case.location
+    loc = case.location or db.query(Location).filter(Location.case_id == case.id).first()
     if not loc:
-        loc = Location(case_id=case.id, raw_query=clean_query)
+        loc = Location(case=case, case_id=case.id, raw_query=clean_query)
+        case.location = loc
         db.add(loc)
+    else:
+        case.location = loc
 
     loc.raw_query = clean_query
     loc.formatted_address = result.formatted_address
@@ -143,10 +149,13 @@ def manually_verify_case_location(
     if not case:
         raise ValueError(f"Case with ID '{case_id}' not found.")
 
-    loc = case.location
+    loc = case.location or db.query(Location).filter(Location.case_id == case.id).first()
     if not loc:
-        loc = Location(case_id=case.id, raw_query=formatted_address or "Manual Dispatcher Entry")
+        loc = Location(case=case, case_id=case.id, raw_query=formatted_address or "Manual Dispatcher Entry")
+        case.location = loc
         db.add(loc)
+    else:
+        case.location = loc
 
     loc.latitude = latitude
     loc.longitude = longitude

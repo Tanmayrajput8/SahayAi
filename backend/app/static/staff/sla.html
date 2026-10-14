@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SahayAI SLA Monitoring & Supervisor Escalations">
+  <title>SahayAI — SLA &amp; Escalations | Operations Command</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/layout.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/staff.css">
+  <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <aside class="sidebar" id="staffSidebar"></aside>
+
+    <div class="main-wrapper">
+      <header class="top-bar">
+        <div class="top-bar-title">
+          <span>⏱️</span>
+          <span>SLA Threshold Monitoring &amp; Escalations</span>
+        </div>
+
+        <div class="top-bar-actions">
+          <button class="btn btn-primary btn-sm" id="btnTriggerSLACycle">⏱️ Trigger SLA Check Cycle</button>
+          <button class="btn btn-outline btn-sm" id="btnRefreshSLA">🔄 Refresh</button>
+        </div>
+      </header>
+
+      <main class="content-area">
+
+        <!-- Active SLA Countdown Timers -->
+        <div style="margin-bottom:24px;">
+          <h4 style="font-size:1.05rem; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+            <span>⏱️</span> <span>Active Emergency Case Timers</span>
+          </h4>
+          <div id="slaTimersGrid" class="sla-grid"></div>
+        </div>
+
+        <!-- Escalations Management Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span>⚠️</span>
+              <span>Supervisor Escalation Alerts</span>
+            </div>
+            <div>
+              <label style="display:flex; align-items:center; gap:6px; font-size:0.82rem; color:var(--text-secondary); cursor:pointer;">
+                <input type="checkbox" id="toggleResolvedEscalations"> Show Resolved Alerts
+              </label>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Alert ID</th>
+                  <th>Case ID</th>
+                  <th>Level</th>
+                  <th>Triggered By</th>
+                  <th>Escalation Reason</th>
+                  <th>Created</th>
+                  <th>Resolution / Actions</th>
+                </tr>
+              </thead>
+              <tbody id="escalationsTableBody">
+                <tr>
+                  <td colspan="7" style="text-align:center; padding:32px;">
+                    <span class="spinner"></span>
+                    <div style="margin-top:8px; color:var(--text-muted);">Loading supervisor escalations…</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/static/js/core/api.js"></script>
+  <script src="/static/js/core/auth.js"></script>
+  <script src="/static/js/core/utils.js"></script>
+  <script src="/static/js/staff/sla.js"></script>
+</body>
+</html>

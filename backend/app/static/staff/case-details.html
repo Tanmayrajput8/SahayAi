@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SahayAI Case Dossier & Intelligence Pipeline Inspector">
+  <title>SahayAI — Case Dossier | Operations Command</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/layout.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/staff.css">
+  <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <aside class="sidebar" id="staffSidebar"></aside>
+
+    <div class="main-wrapper">
+      <header class="top-bar">
+        <div class="top-bar-title">
+          <span>🔍</span>
+          <span>Emergency Case Dossier</span>
+        </div>
+
+        <div class="top-bar-actions">
+          <a href="/staff/cases" class="btn btn-outline btn-sm">← Back to Cases</a>
+        </div>
+      </header>
+
+      <main class="content-area">
+        <div id="caseInspectorContainer"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Manual Location Override Modal -->
+  <div class="modal-overlay" id="locationModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 style="margin:0; font-size:1.1rem; display:flex; align-items:center; gap:8px;">
+          <span>📍</span> <span>Dispatcher Location Override</span>
+        </h4>
+        <button class="btn btn-outline btn-sm" id="btnCloseLocationModal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:16px;">
+          Manually specify or verify GPS latitude/longitude coordinates to resolve ambiguous landmark geocoding.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label" for="manualAddress">Verified Address / Landmark</label>
+          <input type="text" id="manualAddress" class="form-control" placeholder="e.g. Gate 4, Metro Construction, Shivajinagar">
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label" for="manualLat">Latitude (DD.dddd)</label>
+            <input type="number" step="any" id="manualLat" class="form-control" placeholder="18.5314">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="manualLon">Longitude (DD.dddd)</label>
+            <input type="number" step="any" id="manualLon" class="form-control" placeholder="73.8446">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeLocationModal()">Cancel</button>
+        <button class="btn btn-primary" id="btnSaveLocation">Save &amp; Verify Coordinates</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Human Review Intervention Modal -->
+  <div class="modal-overlay" id="reviewModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 style="margin:0; font-size:1.1rem; display:flex; align-items:center; gap:8px;">
+          <span>🧑‍⚕️</span> <span>Human-in-the-Loop Review Intervention</span>
+        </h4>
+        <button class="btn btn-outline btn-sm" id="btnCloseReviewModal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:16px;">
+          Confirm, override or reject AI clinical recommendation with immutable dispatcher provenance.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label" for="reviewActionSelect">Intervention Action</label>
+          <select id="reviewActionSelect" class="form-control">
+            <option value="APPROVE">APPROVE (Accept AI clinical assessment)</option>
+            <option value="MODIFY">MODIFY (Override clinical priority or ambulance tier)</option>
+            <option value="REJECT">REJECT (Dismiss case as invalid or test)</option>
+            <option value="CONFIRM_DUPLICATE">CONFIRM DUPLICATE (Link to existing incident)</option>
+          </select>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label" for="reviewModSeverity">Override Severity Priority</label>
+            <select id="reviewModSeverity" class="form-control">
+              <option value="">Keep Original Assessment</option>
+              <option value="CRITICAL">CRITICAL</option>
+              <option value="HIGH">HIGH</option>
+              <option value="MODERATE">MODERATE</option>
+              <option value="LOW">LOW</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="reviewModAmbulance">Override Ambulance Tier</label>
+            <select id="reviewModAmbulance" class="form-control">
+              <option value="">Keep Original Assessment</option>
+              <option value="ALS">Advanced Life Support (ALS)</option>
+              <option value="BLS">Basic Life Support (BLS)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reviewNotes">Dispatcher Operational Notes / Justification</label>
+          <textarea id="reviewNotes" class="form-control" rows="3" placeholder="Explain rationale for clinical override or confirmation…"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeReviewModal()">Cancel</button>
+        <button class="btn btn-amber" id="btnSubmitReviewAction">Record Review Decision</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/js/core/api.js"></script>
+  <script src="/static/js/core/auth.js"></script>
+  <script src="/static/js/core/utils.js"></script>
+  <script src="/static/js/staff/case-details.js"></script>
+</body>
+</html>

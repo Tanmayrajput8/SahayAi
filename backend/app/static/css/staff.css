@@ -1,0 +1,270 @@
+/* ============================================================
+   SahayAI Design System — Staff Operations Styles
+   ============================================================ */
+
+/* Human Review Banner */
+.review-required-banner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(217, 119, 6, 0.1));
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.15);
+}
+
+.review-required-banner .icon {
+  font-size: 1.8rem;
+}
+
+/* Workflow Actions Bar */
+.workflow-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+}
+
+/* Case Detail 2-Column Grid */
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+}
+
+.detail-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.detail-section h4 {
+  font-size: 0.98rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Step Items inside Detail Section */
+.pipeline-step-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.pipeline-step-body {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+/* Confidence Matrix / Radial Breakdown */
+.conf-summary-card {
+  text-align: center;
+  padding: 20px;
+  background: #090e1b;
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.conf-score-large {
+  font-size: 2.8rem;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.conf-level-tag {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.conf-signal-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.conf-signal-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Audit Timeline Visual Chain */
+.timeline-container {
+  position: relative;
+  padding-left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.timeline-container::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 10px;
+  width: 2px;
+  background: var(--border-color);
+}
+
+.timeline-item {
+  position: relative;
+}
+
+.timeline-node {
+  position: absolute;
+  left: -28px;
+  top: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  border: 2px solid var(--accent-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+}
+
+.timeline-content {
+  background: #090e1b;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+/* SLA Timers Grid */
+.sla-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.sla-card {
+  background: #090e1b;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  border-left: 4px solid var(--accent-emerald);
+}
+.sla-card.warning {
+  border-left-color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.06);
+}
+.sla-card.breach {
+  border-left-color: var(--accent-red);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* Map Shell */
+.map-layout-wrap {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  height: calc(100vh - var(--header-h) - 48px);
+}
+
+.map-viewport {
+  height: 100%;
+  width: 100%;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  position: relative;
+}
+
+.map-sidebar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+/* Staff Login Screen */
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 30%, #172554 0%, #070b14 70%);
+  padding: 20px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.login-header .logo-badge {
+  margin: 0 auto 14px;
+}
+.login-header h2 {
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+}
+.login-header p {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.demo-credentials-box {
+  background: #090e1b;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-top: 20px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.demo-user-pill {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  margin: 3px;
+  cursor: pointer;
+  color: #93c5fd;
+  font-family: var(--font-mono);
+}
+.demo-user-pill:hover {
+  background: rgba(59, 130, 246, 0.25);
+}

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SahayAI Citizen Case Tracker — Live updates, ambulance arrival ETA, and destination hospital information for emergency incidents.">
+  <title>SahayAI — Live Emergency Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/layout.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/citizen.css">
+  <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body class="citizen-body">
+
+  <!-- Header -->
+  <header class="citizen-header">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <a href="/" style="display:flex; align-items:center; gap:12px; text-decoration:none;">
+        <div class="logo-badge">🚨</div>
+        <div class="logo-text">
+          <h1 style="color:var(--text-primary); font-size:1.15rem; font-weight:800;">SahayAI</h1>
+          <span style="color:var(--accent-red); font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;">Live Case Tracker</span>
+        </div>
+      </a>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:12px;">
+      <a href="/" class="btn btn-danger btn-sm">🚨 Report New Emergency</a>
+      <a href="/staff/login" class="btn btn-outline btn-sm">Staff Login →</a>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <main class="citizen-main">
+
+    <!-- Search Case ID Bar -->
+    <div class="card" style="margin-bottom:24px; padding:16px 20px;">
+      <form id="citizenSearchForm" style="display:flex; gap:10px; align-items:center;">
+        <input type="text" id="searchCaseId" class="form-control" placeholder="Enter Case ID (e.g. 5fd7cab1-3f77-41af-ad69-7a8b222fa8ad)" style="font-family:var(--font-mono); font-size:0.88rem;">
+        <button type="submit" class="btn btn-primary" style="flex-shrink:0;">Track Emergency</button>
+      </form>
+    </div>
+
+    <!-- Live Case Content Container (Populated by JS) -->
+    <div id="citizenTrackingContent"></div>
+
+  </main>
+
+  <!-- Citizen Footer -->
+  <footer class="citizen-footer">
+    <div><strong>SahayAI Emergency Tracking Network</strong> · Real-Time Ambulance &amp; Hospital Coordination</div>
+    <div style="margin-top:4px;">In case of worsening medical emergency, call <strong>108</strong> immediately.</div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/js/core/api.js"></script>
+  <script src="/static/js/core/utils.js"></script>
+  <script src="/static/js/citizen/case-status.js"></script>
+</body>
+</html>

@@ -1,0 +1,219 @@
+/* ============================================================
+   SahayAI Design System — Layout & Shell
+   ============================================================ */
+
+/* App Shell Structure */
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Sidebar for Authenticated Staff */
+.sidebar {
+  width: var(--sidebar-w);
+  background: linear-gradient(180deg, #0a1122 0%, #060a16 100%);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 40;
+  transition: transform 0.25s ease;
+}
+
+.sidebar-header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.logo-badge {
+  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+  color: white;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+}
+
+.logo-text h1 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.logo-text span {
+  font-size: 0.68rem;
+  color: var(--accent-red);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.nav-links {
+  list-style: none;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.nav-item a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.nav-item a:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.nav-item.active a {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.15));
+  color: #93c5fd;
+  font-weight: 600;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.nav-item .nav-badge {
+  margin-left: auto;
+  font-size: 0.72rem;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+}
+
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border-color);
+  background: rgba(13, 21, 39, 0.6);
+  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.sidebar-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--accent-blue-bg);
+  border: 1px solid var(--accent-blue-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: var(--accent-blue);
+  font-weight: 700;
+}
+
+/* Main Content Wrapper */
+.main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+  min-width: 0;
+}
+
+/* Top Navigation Bar */
+.top-bar {
+  height: var(--header-h);
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(13, 21, 39, 0.85);
+  backdrop-filter: blur(12px);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  z-index: 30;
+}
+
+.top-bar-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Content Area */
+.content-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* Citizen Portal Layout (No Sidebar) */
+.citizen-body {
+  background: radial-gradient(circle at 50% 0%, #15223e 0%, #070b14 70%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.citizen-header {
+  height: 72px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(10, 16, 30, 0.85);
+  backdrop-filter: blur(14px);
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.citizen-main {
+  flex: 1;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 32px 20px 60px;
+  width: 100%;
+}
+
+.citizen-footer {
+  border-top: 1px solid var(--border-color);
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  background: rgba(10, 16, 30, 0.5);
+}
