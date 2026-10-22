@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.case import Case, CaseStatus, SeverityLevel, InputModality
+from app.models.location import Location, GeocodingStatus
 from app.models.human_review import HumanReview, ReviewStatus
 from app.models.audit import AuditLog, AuditStage
 from app.ai.speech.providers.base import SpeechToTextProvider
@@ -40,6 +41,8 @@ def process_audio_emergency(
     caller_phone: Optional[str] = None,
     manual_location: Optional[str] = None,
     language_hint: Optional[str] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
     db: Session = None,  # type: ignore[assignment]
     speech_provider: Optional[SpeechToTextProvider] = None,
     llm_provider: Optional[LLMProvider] = None,
@@ -95,6 +98,23 @@ def process_audio_emergency(
         db.add(case)
         db.flush()
 
+        if (latitude is not None and longitude is not None) or manual_location:
+            has_gps = latitude is not None and longitude is not None
+            initial_loc = Location(
+                case=case,
+                case_id=case.id,
+                raw_query=manual_location or (f"GPS Coordinates ({latitude:.4f}, {longitude:.4f})" if has_gps else "Unknown"),
+                formatted_address=manual_location,
+                latitude=latitude,
+                longitude=longitude,
+                status=GeocodingStatus.SUCCESS,
+                confidence=1.0 if has_gps else 0.7,
+                is_verified=has_gps,
+                geocoding_provider="device_gps" if has_gps else "caller_input",
+            )
+            case.location = initial_loc
+            db.add(initial_loc)
+
         review = HumanReview(
             case_id=case.id,
             review_status=ReviewStatus.PENDING,
@@ -129,6 +149,23 @@ def process_audio_emergency(
     )
     db.add(case)
     db.flush()
+
+    if (latitude is not None and longitude is not None) or manual_location:
+        has_gps = latitude is not None and longitude is not None
+        initial_loc = Location(
+            case=case,
+            case_id=case.id,
+            raw_query=manual_location or (f"GPS Coordinates ({latitude:.4f}, {longitude:.4f})" if has_gps else "Unknown"),
+            formatted_address=manual_location,
+            latitude=latitude,
+            longitude=longitude,
+            status=GeocodingStatus.SUCCESS,
+            confidence=1.0 if has_gps else 0.7,
+            is_verified=has_gps,
+            geocoding_provider="device_gps" if has_gps else "caller_input",
+        )
+        case.location = initial_loc
+        db.add(initial_loc)
 
     # Log initial intake audit
     audit_intake = AuditLog(

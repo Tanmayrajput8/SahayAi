@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
 from app.models.case import SeverityLevel, AmbulanceType
+from app.ai.normalization.schemas import EmergencyTypeStr
 
 
 class EmergencyExtractionResult(BaseModel):
@@ -12,11 +13,19 @@ class EmergencyExtractionResult(BaseModel):
     """
     emergency_type: str = Field(
         ...,
-        description="Categorized emergency type, e.g. Road Traffic Accident, Cardiac Emergency, Trauma, Burns, Respiratory Distress, Unclear/Pending",
+        description="Categorized emergency type, e.g. CARDIAC, Road Traffic Accident, Respiratory Distress, Burn Injury, Unclear/Pending",
     )
     symptoms: List[str] = Field(
         default_factory=list,
         description="List of clinical signs, symptoms, or reported conditions",
+    )
+    evidence: List[str] = Field(
+        default_factory=list,
+        description="Evidence statements grounding the clinical extraction in caller's narrative",
+    )
+    normalized_medical_text: Optional[str] = Field(
+        default=None,
+        description="Standardized English medical concepts for regional language expressions",
     )
     location: Optional[str] = Field(
         default=None,
@@ -88,6 +97,14 @@ class EmergencyExtractionResult(BaseModel):
             d["confidence_score"] = d.pop("confidence")
         if "type" in d and "emergency_type" not in d:
             d["emergency_type"] = d.pop("type")
+        if "emergency_type" in d and d["emergency_type"]:
+            d["emergency_type"] = EmergencyTypeStr(d["emergency_type"])
+        if "consciousness" in d and "conscious_status" not in d:
+            d["conscious_status"] = d.pop("consciousness")
+        if "breathing" in d and "breathing_status" not in d:
+            d["breathing_status"] = d.pop("breathing")
+        if "evidence" in d and isinstance(d["evidence"], str):
+            d["evidence"] = [d["evidence"]]
         return d
 
     @field_validator("patient_count", mode="before")

@@ -425,8 +425,9 @@ def test_audio_pipeline_verification_and_duplicate_detection(db_session):
         .all()
     )
     stages = [a.stage for a in audits]
-    assert AuditStage.INTAKE in stages or AuditStage.AUDIO_PROCESSING in stages
+    assert AuditStage.INTAKE in stages
     assert AuditStage.AI_EXTRACTION in stages
+
     assert AuditStage.RAG_VERIFICATION in stages
     assert AuditStage.DUPLICATE_CHECK in stages
 

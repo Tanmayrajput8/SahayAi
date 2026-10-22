@@ -131,9 +131,23 @@ class ApiClient {
     });
   }
 
-  async dispatchCase(caseId, strictAmbulanceType = false) {
-    return this.request(`/cases/${caseId}/dispatch?strict_ambulance_type=${strictAmbulanceType}`, {
-      method: 'POST',
+  async dispatchCase(caseId, strictAmbulanceType = false, dispatcherId = 'dispatcher_1', manual = true) {
+    return this.request(
+      `/cases/${caseId}/dispatch?strict_ambulance_type=${strictAmbulanceType}&manual=${manual}&dispatcher_id=${encodeURIComponent(dispatcherId)}`,
+      {
+        method: 'POST',
+      }
+    );
+  }
+
+  async updateCaseStatus(caseId, status, notes = '', dispatcherId = 'dispatcher_1') {
+    return this.request(`/cases/${caseId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status,
+        notes: notes || undefined,
+        dispatcher_id: dispatcherId,
+      }),
     });
   }
 

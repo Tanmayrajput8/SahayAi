@@ -71,7 +71,7 @@ async function loadDashboardData() {
     // Update KPI Metric Cards
     const activeEmergencies = cases.filter(c => c.status !== 'RESOLVED' && c.status !== 'CANCELLED');
     const availableAmb = ambulances.filter(a => a.status === 'AVAILABLE');
-    const activeDispatches = cases.filter(c => c.status === 'DISPATCHED');
+    const activeDispatches = cases.filter(c => c.status === 'DISPATCHED' || c.status === 'ARRIVED');
     const slaWarnings = slaTimers.filter(s => s.is_warning && !s.is_breached);
     const slaBreaches = slaTimers.filter(s => s.is_breached);
 
@@ -122,10 +122,11 @@ async function loadDashboardData() {
             📍 ${Utils.escapeHtml(c.extracted_location || 'Pune')}
           </td>
           <td style="font-weight:600; color:var(--text-primary); max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${Utils.escapeHtml(c.emergency_type || 'General Emergency')}
+            ${Utils.escapeHtml(c.emergency_type || 'Assessing...')}
           </td>
           <td>${Utils.getPriorityBadge(c.priority)}</td>
-          <td><span style="font-size:0.8rem; font-weight:600; color:var(--accent-cyan);">${Utils.escapeHtml(c.recommended_ambulance || 'ALS')}</span></td>
+          <td><span style="font-size:0.8rem; font-weight:600; color:var(--accent-cyan);">${Utils.escapeHtml(c.recommended_ambulance === 'UNKNOWN' ? 'UNKNOWN / REVIEW REQUIRED' : (c.recommended_ambulance || 'PENDING'))}</span></td>
+
           <td style="min-width:100px;">
             <div style="display:flex; justify-content:space-between; font-size:0.75rem; font-weight:600; margin-bottom:2px;">
               <span>${(confScore * 100).toFixed(0)}%</span>
@@ -140,7 +141,7 @@ async function loadDashboardData() {
             <div style="display:flex; gap:6px;">
               <a href="/staff/cases/${encodeURIComponent(c.id)}" class="btn btn-outline btn-sm">Inspect</a>
               ${c.status === 'UNDER_REVIEW' ? `<a href="/staff/review?case_id=${encodeURIComponent(c.id)}" class="btn btn-amber btn-sm">Review</a>` : ''}
-              ${c.status !== 'DISPATCHED' && c.status !== 'RESOLVED' ? `<button class="btn btn-success btn-sm" onclick="quickDispatch('${c.id}')">Dispatch</button>` : ''}
+              ${c.status !== 'DISPATCHED' && c.status !== 'ARRIVED' && c.status !== 'RESOLVED' && c.status !== 'CANCELLED' ? `<button class="btn btn-success btn-sm" onclick="quickDispatch('${c.id}')">Dispatch</button>` : ''}
             </div>
           </td>
         </tr>
@@ -160,7 +161,9 @@ async function loadDashboardData() {
 
 window.quickDispatch = async function(caseId) {
   try {
-    const res = await window.api.dispatchCase(caseId);
+    const user = Auth.getUser();
+    const dispatcher = user ? user.username : 'dispatcher_1';
+    const res = await window.api.dispatchCase(caseId, false, dispatcher, true);
     Utils.showToast(`Ambulance ${res.matched_ambulance?.vehicle_number || ''} dispatched successfully! ETA: ${res.ambulance_eta_minutes ? res.ambulance_eta_minutes.toFixed(1) : '~8'} min`, 'success');
     await loadDashboardData();
   } catch (err) {

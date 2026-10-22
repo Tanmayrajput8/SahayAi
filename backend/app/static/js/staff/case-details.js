@@ -66,10 +66,9 @@ function renderCaseDetails(c, conf, timeline, ambulances, hospitals, ragStatus) 
   const confColor = Utils.getConfidenceColor(confScore);
   const needsReview = c.status === 'UNDER_REVIEW' || (conf && conf.requires_human_review);
 
-  // Matched units
-  const assignedAmb = ambulances.find(a => a.assigned_case_id === c.id || (c.status === 'DISPATCHED' && a.status === 'ASSIGNED'))
-    || (c.status === 'DISPATCHED' ? ambulances[0] : null);
-  const matchedHosp = hospitals[0] || null;
+  // Matched units — from verified dispatch data on the Case object
+  const assignedAmb = c.assigned_ambulance || null;
+  const matchedHosp = c.assigned_hospital || null;
 
   container.innerHTML = `
     <!-- Top Alert Banner if Under Review -->
@@ -139,7 +138,7 @@ function renderCaseDetails(c, conf, timeline, ambulances, hospitals, ragStatus) 
             </div>
             <div style="background:#090e1b; border:1px solid var(--border-color); padding:12px; border-radius:var(--radius-md);">
               <div class="pipeline-step-title">Recommended Ambulance Tier</div>
-              <div style="font-size:1rem; font-weight:800; color:var(--accent-cyan);">${Utils.escapeHtml(c.recommended_ambulance || 'ALS')}</div>
+              <div style="font-size:1rem; font-weight:800; color:var(--accent-cyan);">${Utils.escapeHtml(c.recommended_ambulance === 'UNKNOWN' ? 'UNKNOWN / REVIEW REQUIRED' : (c.recommended_ambulance || 'PENDING'))}</div>
             </div>
             <div style="background:#090e1b; border:1px solid var(--border-color); padding:12px; border-radius:var(--radius-md);">
               <div class="pipeline-step-title">Patients / Vitals</div>
@@ -162,9 +161,10 @@ function renderCaseDetails(c, conf, timeline, ambulances, hospitals, ragStatus) 
           <!-- AI vs Deterministic Comparison -->
           <div style="background:#090e1b; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; font-size:0.82rem; margin-bottom:12px;">
             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-              <span>AI Suggested: <strong>${Utils.escapeHtml(c.ai_suggested_severity || c.priority)}</strong> (${Utils.escapeHtml(c.ai_suggested_ambulance || c.recommended_ambulance || 'ALS')})</span>
-              <span>Deterministic Clinical Rule: <strong>${Utils.escapeHtml(c.deterministic_severity || c.priority)}</strong> (${Utils.escapeHtml(c.deterministic_ambulance || c.recommended_ambulance || 'ALS')})</span>
+              <span>AI Suggested: <strong>${Utils.escapeHtml(c.ai_suggested_severity || c.priority)}</strong> (${Utils.escapeHtml(c.ai_suggested_ambulance === 'UNKNOWN' ? 'UNKNOWN' : (c.ai_suggested_ambulance || 'PENDING'))})</span>
+              <span>Deterministic Clinical Rule: <strong>${Utils.escapeHtml(c.deterministic_severity || c.priority)}</strong> (${Utils.escapeHtml(c.deterministic_ambulance === 'UNKNOWN' ? 'UNKNOWN' : (c.deterministic_ambulance || 'PENDING'))})</span>
             </div>
+
             ${c.has_conflict ? `
               <div style="color:var(--accent-amber); margin-top:4px;">
                 ⚠️ <strong>Conflict Reason:</strong> ${Utils.escapeHtml(c.conflict_reason || 'AI recommendation differed from deterministic protocols')}
@@ -236,7 +236,8 @@ function renderCaseDetails(c, conf, timeline, ambulances, hospitals, ragStatus) 
               ${assignedAmb ? `
                 <div style="font-size:1.1rem; font-weight:800; color:var(--accent-emerald);">${assignedAmb.vehicle_number} (${assignedAmb.ambulance_type})</div>
                 <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:2px;">Base: ${assignedAmb.base_station}</div>
-                <div style="font-size:0.82rem; color:var(--text-secondary);">Driver: <strong>${assignedAmb.driver_name}</strong> (${assignedAmb.contact_number})</div>
+                <div style="font-size:0.82rem; color:var(--text-secondary);">Driver: <strong>${assignedAmb.driver_name || 'Assigned'}</strong> (${assignedAmb.contact_number || 'N/A'})</div>
+                ${c.eta_minutes ? `<div style="font-size:0.82rem; color:var(--accent-cyan); margin-top:4px;">⏱️ ETA: <strong>~${Math.round(c.eta_minutes)} min</strong> (${(c.ambulance_distance_km || 0).toFixed(1)} km)</div>` : ''}
               ` : `
                 <div style="color:var(--text-muted); font-size:0.85rem;">No ambulance currently locked to case.</div>
               `}
@@ -248,16 +249,31 @@ function renderCaseDetails(c, conf, timeline, ambulances, hospitals, ragStatus) 
                 <div style="font-size:1.1rem; font-weight:800; color:var(--accent-blue);">${matchedHosp.name}</div>
                 <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:2px;">${matchedHosp.address}</div>
                 <div style="font-size:0.82rem; color:var(--accent-emerald);">Beds Available: <strong>${matchedHosp.available_beds}</strong> (ICU: ${matchedHosp.available_icu_beds})</div>
+                ${c.hospital_distance_km ? `<div style="font-size:0.82rem; color:var(--accent-cyan); margin-top:2px;">📍 Distance: <strong>${c.hospital_distance_km.toFixed(1)} km</strong></div>` : ''}
               ` : `
-                <div style="color:var(--text-muted); font-size:0.85rem;">Sassoon General Hospital</div>
+              <div style="color:var(--text-muted); font-size:0.85rem;">No hospital matched yet. Run Dispatch to assign nearest capable hospital.</div>
               `}
             </div>
           </div>
 
-          <div style="display:flex; justify-content:flex-end;">
-            <button class="btn btn-success" onclick="triggerDispatch()">
-              ${c.status === 'DISPATCHED' ? '🔄 Re-Verify & Re-Dispatch' : '🚑 Dispatch Nearest Available Units Now'}
-            </button>
+          <div style="display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; align-items:center;">
+            ${c.status === 'DISPATCHED' ? `
+              <span class="badge badge-dispatched" style="padding:8px 12px; font-weight:800;">🚑 DISPATCHED / EN ROUTE (ETA: ~${Math.round(c.eta_minutes || 8)} min)</span>
+              <button class="btn btn-primary" onclick="markArrived()">📍 ARRIVED (At Scene)</button>
+              <button class="btn" style="background:#7c3aed; color:#fff;" onclick="markCompleted()">✅ COMPLETED (Transfer Patient)</button>
+              <button class="btn btn-outline btn-sm" onclick="simulateProgression()" title="Auto-advance En Route → Arrived → Completed">⚡ Auto-Simulate</button>
+              <button class="btn btn-outline btn-sm" onclick="triggerDispatch()">🔄 Re-Dispatch</button>
+            ` : (c.status === 'ARRIVED' ? `
+              <span class="badge badge-arrived" style="padding:8px 12px; font-weight:800;">🚨 ARRIVED AT SCENE</span>
+              <button class="btn btn-success" onclick="markCompleted()">✅ COMPLETED (Transfer & Close)</button>
+              <button class="btn btn-outline btn-sm" onclick="triggerDispatch()">🔄 Re-Dispatch</button>
+            ` : (c.status === 'RESOLVED' ? `
+              <span class="badge badge-resolved" style="padding:8px 12px; font-weight:800;">✅ COMPLETED (Case Successfully Closed)</span>
+            ` : `
+              <button class="btn btn-success" style="font-weight:800; font-size:0.95rem; padding:10px 18px;" onclick="triggerDispatch()">
+                🚀 CLICK "DISPATCH" (Assign Ambulance &amp; Hospital)
+              </button>
+            `))}
           </div>
         </div>
 
@@ -308,17 +324,101 @@ function renderCaseDetails(c, conf, timeline, ambulances, hospitals, ragStatus) 
 
           <!-- 6 Weighted Signals -->
           <div style="display:flex; flex-direction:column; gap:8px;">
-            ${renderConfidenceRow('Clinical Extraction', conf?.components?.extraction_quality, '25%')}
-            ${renderConfidenceRow('Deterministic Rule Agreement', conf?.components?.rule_agreement, '20%')}
+            ${renderConfidenceRow('Clinical Extraction', conf?.components?.extraction_completeness ?? conf?.components?.extraction_quality, '25%')}
+            ${renderConfidenceRow('Deterministic Rule Agreement', conf?.components?.rule_llm_agreement ?? conf?.components?.rule_agreement, '20%')}
             ${renderConfidenceRow('Spatial Location Verification', conf?.components?.location_verification, '20%')}
             ${renderConfidenceRow('Resource Availability', conf?.components?.resource_availability, '15%')}
-            ${renderConfidenceRow('Duplicate Anomaly Check', conf?.components?.duplicate_penalty, '10%')}
-            ${renderConfidenceRow('LLM Direct Confidence', conf?.components?.llm_direct_confidence, '10%')}
+            ${renderConfidenceRow('Duplicate Certainty', conf?.components?.duplicate_certainty ?? conf?.components?.duplicate_penalty, '10%')}
+            ${renderConfidenceRow('LLM Direct Confidence', conf?.components?.llm_confidence ?? conf?.components?.llm_direct_confidence, '10%')}
           </div>
 
           <div style="margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.06); font-size:0.8rem; color:var(--text-secondary);">
             Requires Human Review: <strong style="color:${needsReview ? 'var(--accent-amber)' : 'var(--accent-emerald)'};">${needsReview ? '⚠️ YES' : 'NO'}</strong>
           </div>
+        </div>
+
+        <!-- Real Multi-Signal Duplicate Detection Card -->
+        <div class="detail-section">
+          <h4>🔍 Duplicate Detection</h4>
+          ${(() => {
+            const dup = c.duplicate_detection;
+            if (!dup || (dup.status === 'NOT_DUPLICATE' && (!dup.score || dup.score < 0.20))) {
+              return `
+                <div style="background:#090e1b; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">STATUS</span>
+                    <span class="badge" style="background:#052e16; color:#4ade80; border:1px solid #166534; font-weight:700;">INDEPENDENT INCIDENT</span>
+                  </div>
+                  <div style="margin-top:8px; font-size:0.82rem; color:var(--text-secondary);">
+                    Duplicate Score: <strong style="color:var(--accent-emerald);">${dup ? (dup.score).toFixed(2) : '0.00'}</strong> · No duplicate incident detected in candidate window.
+                  </div>
+                </div>
+              `;
+            }
+            const statusColor = dup.status === 'DUPLICATE' ? 'var(--accent-red)' : dup.status === 'POSSIBLE_DUPLICATE' ? 'var(--accent-amber)' : 'var(--accent-blue)';
+            const statusBg = dup.status === 'DUPLICATE' ? '#450a0a' : dup.status === 'POSSIBLE_DUPLICATE' ? '#451a03' : '#082f49';
+            return `
+              <div style="background:#090e1b; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:14px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Status</span>
+                  <span class="badge" style="background:${statusBg}; color:${statusColor}; border:1px solid ${statusColor}; font-weight:800; font-size:0.82rem;">
+                    ${dup.status.replace('_', ' ')}
+                  </span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">
+                  <span style="font-size:0.8rem; color:var(--text-secondary);">Overall Duplicate Score:</span>
+                  <span style="font-size:1.3rem; font-weight:900; color:${statusColor}; font-family:var(--font-mono);">
+                    ${dup.score.toFixed(2)}
+                  </span>
+                </div>
+                ${dup.matched_case_id ? `
+                  <div style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:12px; padding:8px 10px; background:#060a14; border-radius:6px;">
+                    Matched Candidate Case: <a href="/staff/cases/${encodeURIComponent(dup.matched_case_id)}" style="font-family:var(--font-mono); font-weight:700; color:var(--accent-cyan);">CASE-${dup.matched_case_id.substring(0, 8)}</a>
+                  </div>
+                ` : ''}
+
+                <!-- Signals Breakdown -->
+                <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:6px;">Signals</div>
+                <div style="display:flex; flex-direction:column; gap:6px; font-size:0.8rem;">
+                  <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--text-secondary);">Semantic similarity:</span>
+                    <strong style="color:var(--text-primary); font-family:var(--font-mono);">${dup.semantic_similarity.toFixed(2)}</strong>
+                  </div>
+                  <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--text-secondary);">Location distance:</span>
+                    <strong style="color:var(--text-primary); font-family:var(--font-mono);">${dup.geographic_distance_km !== null ? `${dup.geographic_distance_km.toFixed(1)} km` : 'Unverified location'}</strong>
+                  </div>
+                  <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--text-secondary);">Temporal difference:</span>
+                    <strong style="color:var(--text-primary); font-family:var(--font-mono);">${Math.round(dup.temporal_diff_minutes)} min</strong>
+                  </div>
+                  <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--text-secondary);">Emergency type similarity:</span>
+                    <strong style="color:var(--text-primary); font-family:var(--font-mono);">${dup.emergency_type_similarity.toFixed(2)}</strong>
+                  </div>
+                </div>
+
+                <!-- Weighted Formula -->
+                <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); font-size:0.74rem; font-family:var(--font-mono); color:var(--text-muted);">
+                  Weighted score:<br>
+                  0.40×${dup.semantic_similarity.toFixed(2)} + 0.30×${dup.location_similarity.toFixed(2)} + 0.15×${dup.temporal_similarity.toFixed(2)} + 0.15×${dup.emergency_type_similarity.toFixed(2)}<br>
+                  Final: <strong style="color:${statusColor}; font-size:0.85rem;">${dup.score.toFixed(2)}</strong>
+                </div>
+
+                <div style="margin-top:10px; font-size:0.8rem; color:var(--text-secondary); display:flex; justify-content:space-between;">
+                  <span>Human Review:</span>
+                  <strong style="color:${dup.requires_review ? 'var(--accent-amber)' : 'var(--accent-emerald)'};">
+                    ${dup.requires_review ? '⚠️ Required' : 'Not Required'}
+                  </strong>
+                </div>
+                ${dup.requires_review ? `
+                  <button class="btn btn-outline btn-sm" style="width:100%; margin-top:10px; font-weight:700;" onclick="openReviewModal()">
+                    Intervene: Confirm / Reject Duplicate
+                  </button>
+                ` : ''}
+              </div>
+            `;
+          })()}
         </div>
 
         <!-- Case Metadata Card -->
@@ -343,7 +443,21 @@ function renderCaseDetails(c, conf, timeline, ambulances, hospitals, ragStatus) 
 }
 
 function renderConfidenceRow(label, score, weight) {
-  const val = score !== null && score !== undefined ? score : 0.8;
+  // Use actual backend score; do NOT substitute a fake default (0.8 would be misleading)
+  if (score === null || score === undefined) {
+    return `
+    <div class="conf-signal-row">
+      <div class="conf-signal-meta">
+        <span>${label} (${weight})</span>
+        <span style="font-weight:700; color:var(--text-muted);">N/A</span>
+      </div>
+      <div class="conf-bar-wrap">
+        <div class="conf-bar" style="width:0%; background:var(--text-muted);"></div>
+      </div>
+    </div>
+    `;
+  }
+  const val = score;
   const col = Utils.getConfidenceColor(val);
   return `
     <div class="conf-signal-row">
@@ -367,22 +481,39 @@ function initMiniMap(c) {
     caseMiniMap = null;
   }
 
-  const lat = c.latitude || 18.5204;
-  const lon = c.longitude || 73.8567;
+  // Only show marker if we have REAL verified or geocoded coordinates
+  const hasCoords = c.latitude && c.longitude && c.geocoding_status !== 'failed';
+  if (!hasCoords) {
+    mapEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; background:#090e1b; border-radius:var(--radius-md); color:var(--text-muted); gap:8px;">
+        <span style="font-size:2rem;">📍</span>
+        <span style="font-weight:700; color:var(--accent-amber);">Location Not Verified</span>
+        <span style="font-size:0.82rem; text-align:center; max-width:260px;">
+          ${c.location_error || 'No geocoded coordinates available. Dispatcher must set location manually using the Override Location button.'}
+        </span>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="openLocationModal()">✏️ Set Coordinates</button>
+      </div>
+    `;
+    return;
+  }
 
-  caseMiniMap = L.map('caseMiniMap').setView([lat, lon], 13);
+  caseMiniMap = L.map('caseMiniMap').setView([c.latitude, c.longitude], 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 18,
     attribution: '© OpenStreetMap contributors',
   }).addTo(caseMiniMap);
 
-  L.circleMarker([lat, lon], {
+  const verifiedColor = c.is_location_verified ? '#22c55e' : '#f59e0b';
+  L.circleMarker([c.latitude, c.longitude], {
     radius: 10,
-    fillColor: '#ef4444',
+    fillColor: verifiedColor,
     color: '#ffffff',
     weight: 2,
     fillOpacity: 0.95,
-  }).addTo(caseMiniMap).bindPopup(`<strong>🚨 Incident Site</strong><br>${Utils.escapeHtml(c.extracted_location || c.raw_text || '')}`).openPopup();
+  }).addTo(caseMiniMap).bindPopup(
+    `<strong>🚨 Incident Site</strong><br>${Utils.escapeHtml(c.extracted_location || '')}<br>` +
+    `<small>${c.is_location_verified ? '✅ Verified' : '⚠️ Unverified — Dispatcher confirmation needed'}</small>`
+  ).openPopup();
 }
 
 /* ── Modals & Pipeline Operations ───────────────────────────── */
@@ -482,10 +613,64 @@ window.triggerRAGVerify = async function() {
 window.triggerDispatch = async function() {
   try {
     Utils.showToast('Running spatial resource matching and OSRM routing…', 'info');
-    const match = await window.api.dispatchCase(currentCaseId);
+    const user = Auth.getUser();
+    const dispatcher = user ? user.username : 'dispatcher_1';
+    const match = await window.api.dispatchCase(currentCaseId, false, dispatcher, true);
     Utils.showToast(`✅ Dispatched ambulance: ${match.matched_ambulance?.vehicle_number || ''} (ETA: ${match.ambulance_eta_minutes ? match.ambulance_eta_minutes.toFixed(1) : '~8'} min)`, 'success');
     await loadCaseDetails();
   } catch (err) {
     alert('Dispatch failed: ' + err.message);
   }
+};
+
+window.markArrived = async function() {
+  try {
+    const user = Auth.getUser();
+    const dispatcher = user ? user.username : 'dispatcher_1';
+    Utils.showToast('Updating status: Ambulance Arrived at Scene…', 'info');
+    await window.api.updateCaseStatus(currentCaseId, 'ARRIVED', 'Ambulance arrived at incident coordinates', dispatcher);
+    Utils.showToast('🚨 Case updated: AMBULANCE ARRIVED AT SCENE', 'success');
+    await loadCaseDetails();
+  } catch (err) {
+    alert('Failed to mark arrived: ' + err.message);
+  }
+};
+
+window.markCompleted = async function() {
+  try {
+    const user = Auth.getUser();
+    const dispatcher = user ? user.username : 'dispatcher_1';
+    Utils.showToast('Completing emergency case and releasing ambulance to AVAILABLE…', 'info');
+    await window.api.updateCaseStatus(currentCaseId, 'RESOLVED', 'Patient care transferred to hospital emergency department', dispatcher);
+    Utils.showToast('✅ Emergency COMPLETED & patient transferred!', 'success');
+    await loadCaseDetails();
+  } catch (err) {
+    alert('Failed to complete case: ' + err.message);
+  }
+};
+
+window.simulateProgression = async function() {
+  const user = Auth.getUser();
+  const dispatcher = user ? user.username : 'dispatcher_1';
+  Utils.showToast('⚡ Simulating response progression (En Route → Arrived → Completed)…', 'info', 4000);
+
+  setTimeout(async () => {
+    try {
+      await window.api.updateCaseStatus(currentCaseId, 'ARRIVED', 'Live telemetry: unit arrived at incident scene', dispatcher);
+      Utils.showToast('🚨 Telemetry: Unit ARRIVED at incident scene!', 'info', 3000);
+      await loadCaseDetails();
+    } catch (e) {
+      console.error(e);
+    }
+  }, 3500);
+
+  setTimeout(async () => {
+    try {
+      await window.api.updateCaseStatus(currentCaseId, 'RESOLVED', 'Live telemetry: patient safely transferred to hospital emergency department', dispatcher);
+      Utils.showToast('✅ Telemetry: Incident COMPLETED! Patient in hospital care.', 'success', 4000);
+      await loadCaseDetails();
+    } catch (e) {
+      console.error(e);
+    }
+  }, 8000);
 };

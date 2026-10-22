@@ -40,15 +40,20 @@ def process_case_geocoding(
 
     # 1. Handle Missing / Omitted Location
     if not clean_query:
-        loc = case.location or db.query(Location).filter(Location.case_id == case.id).first()
-        if not loc:
-            loc = Location(case=case, case_id=case.id, raw_query="[Location Not Mentioned]")
+        # Query for existing location record — never create a second one
+        loc = db.query(Location).filter(Location.case_id == case.id).first()
+        if loc and loc.latitude is not None and loc.longitude is not None:
+            # Preserve caller/device GPS coordinates attached at intake
             case.location = loc
+            return loc, None
+
+        if not loc:
+            loc = Location(case_id=case.id, raw_query="[Location Not Mentioned]")
             db.add(loc)
         else:
-            case.location = loc
+            case.location = loc  # ensure relationship is wired
 
-        loc.raw_query = "[Location Not Mentioned]"
+        loc.raw_query = loc.raw_query or "[Location Not Mentioned]"
         loc.latitude = None
         loc.longitude = None
         loc.formatted_address = None
@@ -57,6 +62,9 @@ def process_case_geocoding(
         loc.confidence = 0.0
         loc.is_verified = False
         loc.error_message = "No location extracted from emergency narrative or caller input."
+
+        if case.location is None:
+            case.location = loc
 
         audit = AuditLog(
             case_id=case.id,
@@ -75,24 +83,40 @@ def process_case_geocoding(
     # 2. Execute Geocoding via Provider
     result: GeocodingResult = provider.geocode(clean_query)
 
-    # 3. Update or Create Location Record
-    loc = case.location or db.query(Location).filter(Location.case_id == case.id).first()
+    # 3. Update or Create Location Record — use upsert pattern to prevent duplicate locations.
+    # The Location.case_id has a UNIQUE constraint; always query first, update in place.
+    loc = db.query(Location).filter(Location.case_id == case.id).first()
     if not loc:
-        loc = Location(case=case, case_id=case.id, raw_query=clean_query)
-        case.location = loc
+        loc = Location(case_id=case.id, raw_query=clean_query)
         db.add(loc)
-    else:
+
+    # Wire the relationship without triggering a new INSERT
+    if case.location is None or case.location is not loc:
         case.location = loc
 
     loc.raw_query = clean_query
-    loc.formatted_address = result.formatted_address
-    loc.latitude = result.latitude
-    loc.longitude = result.longitude
-    loc.geocoding_provider = result.provider
-    loc.status = result.status
-    loc.confidence = result.confidence
-    loc.is_verified = result.is_verified
-    loc.error_message = result.error_message
+    if result.latitude is not None and result.longitude is not None:
+        loc.formatted_address = result.formatted_address or loc.formatted_address
+        loc.latitude = result.latitude
+        loc.longitude = result.longitude
+        loc.geocoding_provider = result.provider
+        loc.status = result.status
+        loc.confidence = result.confidence
+        loc.is_verified = result.is_verified
+        loc.error_message = result.error_message
+    else:
+        # Preserve caller/device GPS coordinates if already present
+        if loc.latitude is None or loc.longitude is None:
+            loc.formatted_address = result.formatted_address
+            loc.latitude = None
+            loc.longitude = None
+            loc.geocoding_provider = result.provider
+            loc.status = result.status
+            loc.confidence = result.confidence
+            loc.is_verified = False
+            loc.error_message = result.error_message
+        else:
+            loc.geocoding_provider = loc.geocoding_provider or result.provider
 
     # 4. Audit Log
     action_name = f"GEOCODING_{result.status.value.upper()}"

@@ -42,8 +42,9 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         user_id=user.id,
         username=user.username,
         role=user.role,
-        user=user,
+        user=UserPublicProfile.model_validate(user),
     )
+
 
 
 @router.get("/me", response_model=UserPublicProfile)

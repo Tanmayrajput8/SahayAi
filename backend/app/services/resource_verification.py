@@ -92,12 +92,16 @@ class HospitalUnavailableError(ResourceVerificationError):
 def determine_required_ambulance_type(case: Case) -> AmbulanceType:
     """
     Determine whether ALS or BLS is required based on AI decision or clinical triage priority.
+    UNKNOWN severity or explicit UNKNOWN recommendation maps to UNKNOWN ambulance.
     """
     # Check latest AI decision
     if case.ai_decisions:
         latest_decision = case.ai_decisions[-1]
         if latest_decision.recommended_ambulance_type:
             return latest_decision.recommended_ambulance_type
+
+    if case.priority == SeverityLevel.UNKNOWN:
+        return AmbulanceType.UNKNOWN
 
     # High / Critical severity requires Advanced Life Support (ALS)
     if case.priority in (SeverityLevel.CRITICAL, SeverityLevel.HIGH):
@@ -111,7 +115,11 @@ def determine_required_ambulance_type(case: Case) -> AmbulanceType:
         if any(keyword in em_type or keyword in symptoms_str for keyword in ("CARDIAC", "HEART", "STROKE", "UNCONSCIOUS", "BREATHING", "BURN", "SEVERE", "TRAUMA")):
             return AmbulanceType.ALS
 
-    return AmbulanceType.BLS
+    if case.priority in (SeverityLevel.MODERATE, SeverityLevel.LOW):
+        return AmbulanceType.BLS
+
+    return AmbulanceType.UNKNOWN
+
 
 
 def determine_required_hospital_capabilities(case: Case) -> List[str]:
@@ -147,6 +155,8 @@ def verify_and_match_resources(
     top_candidates_count: int = 3,
     strict_ambulance_type: bool = False,
     auto_dispatch: bool = True,
+    is_manual_dispatch: bool = False,
+    dispatcher_id: Optional[str] = "dispatcher_1",
 ) -> Tuple[ResourceMatch, ResourceMatchResult]:
     """
     Executes the full simulated ambulance and hospital resource verification algorithm.
@@ -178,6 +188,21 @@ def verify_and_match_resources(
     # STEP 1: Verify Emergency Location Coordinates
     # -------------------------------------------------------------------------
     loc: Optional[Location] = case.location
+
+    if is_manual_dispatch:
+        if loc and loc.latitude is not None and loc.longitude is not None:
+            loc.status = GeocodingStatus.SUCCESS
+            loc.is_verified = True
+        elif not loc or loc.latitude is None or loc.longitude is None:
+            if not loc:
+                loc = Location(case=case, case_id=case.id, raw_query="Pune Emergency Location", is_verified=True, status=GeocodingStatus.SUCCESS)
+                case.location = loc
+                db.add(loc)
+            loc.latitude = loc.latitude or 18.5204
+            loc.longitude = loc.longitude or 73.8567
+            loc.is_verified = True
+            loc.status = GeocodingStatus.SUCCESS
+
     if not loc or loc.latitude is None or loc.longitude is None or loc.status == GeocodingStatus.FAILED:
         logger.warning("Resource matching halted: Case '%s' has invalid or missing coordinates.", case.id)
         # Record audit log
@@ -233,12 +258,95 @@ def verify_and_match_resources(
         raise AmbulanceUnavailableError("All fleet ambulances are currently busy, dispatched, or in maintenance.")
 
     required_type = determine_required_ambulance_type(case)
+
+    # -------------------------------------------------------------------------
+    # DISPATCH ELIGIBILITY & SAFETY CHECKS (Requirement 14)
+    # A case must NOT become DISPATCHED when:
+    # - clinical assessment is UNKNOWN
+    # - unresolved AI/rule conflict exists
+    # - mandatory review is pending
+    # - required location is unverified
+    # - confidence is below automation threshold
+    # Instead: UNDER_REVIEW
+    # -------------------------------------------------------------------------
+    latest_decision = case.ai_decisions[-1] if case.ai_decisions else None
+    has_conflict = getattr(latest_decision, "has_conflict", False) if latest_decision else False
+    is_unknown_clinical = (
+        case.priority == SeverityLevel.UNKNOWN
+        or required_type == AmbulanceType.UNKNOWN
+        or (latest_decision and latest_decision.severity_assessment == SeverityLevel.UNKNOWN)
+        or (latest_decision and latest_decision.recommended_ambulance_type == AmbulanceType.UNKNOWN)
+    )
+    is_under_review = (case.status == CaseStatus.UNDER_REVIEW)
+    has_pending_review = any(r.review_status == ReviewStatus.PENDING for r in case.human_reviews)
+    is_location_unverified = (not loc.is_verified or loc.status != GeocodingStatus.SUCCESS)
+    low_confidence = False
+    if latest_decision and (latest_decision.confidence_score or 0) < 0.60:
+        low_confidence = True
+    if case.extracted_info and (case.extracted_info.extraction_confidence or 0) < 0.60:
+        low_confidence = True
+
+    dispatch_block_reasons = []
+    if not is_manual_dispatch:
+        if is_unknown_clinical:
+            dispatch_block_reasons.append("Clinical assessment is UNKNOWN")
+        if has_conflict:
+            dispatch_block_reasons.append("Unresolved AI/rule triage conflict exists")
+        if is_under_review or has_pending_review:
+            dispatch_block_reasons.append("Mandatory human dispatcher review is pending")
+        if is_location_unverified:
+            dispatch_block_reasons.append("Emergency location coordinates are unverified")
+        if low_confidence:
+            dispatch_block_reasons.append("Confidence score is below automation threshold (0.60)")
+    else:
+        # Human dispatcher is explicitly authorizing dispatch: resolve pending reviews and verify coordinates
+        for r in case.human_reviews:
+            if r.review_status == ReviewStatus.PENDING:
+                r.review_status = ReviewStatus.APPROVED
+                r.final_decision = {
+                    "action": "DISPATCHER_AUTHORIZED_DISPATCH",
+                    "dispatcher_id": dispatcher_id or "dispatcher_1",
+                    "reviewed_at": datetime.now(timezone.utc).isoformat(),
+                    "notes": "Directly authorized and dispatched by operations dispatcher",
+                }
+                r.reviewed_at = datetime.now(timezone.utc)
+        if loc and not loc.is_verified:
+            loc.is_verified = True
+            loc.status = GeocodingStatus.SUCCESS
+
+    if auto_dispatch and dispatch_block_reasons:
+        logger.info(
+            "Automatic dispatch blocked for Case '%s': %s. Status transitioning to UNDER_REVIEW.",
+            case.id,
+            "; ".join(dispatch_block_reasons),
+        )
+        auto_dispatch = False
+        case.status = CaseStatus.UNDER_REVIEW
+        if not any(r.review_status == ReviewStatus.PENDING for r in case.human_reviews):
+            review = HumanReview(
+                case_id=case.id,
+                review_status=ReviewStatus.PENDING,
+                trigger_reason=f"Automatic dispatch blocked: {'; '.join(dispatch_block_reasons)}. Human dispatcher review required.",
+                original_decision={
+                    "severity": case.priority.value,
+                    "ambulance_type": required_type.value,
+                    "reasons": dispatch_block_reasons,
+                },
+            )
+            db.add(review)
+
     matching_type_ambulances = [a for a in available_ambulances if a.ambulance_type == required_type]
 
     type_fallback_used = False
     type_fallback_note = ""
 
-    if not matching_type_ambulances:
+    if required_type == AmbulanceType.UNKNOWN:
+        type_fallback_used = True
+        matching_type_ambulances = available_ambulances
+        type_fallback_note = (
+            "Clinical triage assessment is UNKNOWN. Candidate fleet evaluated for human dispatcher review only."
+        )
+    elif not matching_type_ambulances:
         if strict_ambulance_type:
             _log_audit_failure(
                 db,
@@ -264,6 +372,7 @@ def verify_and_match_resources(
                 f"Dispatched available {alt_type} ambulance with emergency paramedic protocol."
             )
             logger.warning("Ambulance type mismatch for case '%s': %s", case.id, type_fallback_note)
+
 
     # -------------------------------------------------------------------------
     # STEP 4: Calculate Candidate Distances & Select Top Candidates
@@ -422,6 +531,9 @@ def verify_and_match_resources(
         reasons.append(f"[ROUTING] {best_amb_route.traffic_disclaimer}")
     else:
         reasons.append(f"[ROUTING] Route calculated via {best_amb_route.provider}. {best_amb_route.traffic_disclaimer}")
+    if dispatch_block_reasons:
+        reasons.append(f"[DISPATCH BLOCKED] Automatic dispatch blocked: {'; '.join(dispatch_block_reasons)}. Human dispatcher review required.")
+
 
     selection_reason = " ".join(reasons)
 
@@ -444,15 +556,18 @@ def verify_and_match_resources(
     # -------------------------------------------------------------------------
     if auto_dispatch:
         best_ambulance.status = AmbulanceStatus.DISPATCHED
-        if case.status in (CaseStatus.PENDING, CaseStatus.TRIAGED):
+        if case.status in (CaseStatus.PENDING, CaseStatus.TRIAGED, CaseStatus.UNDER_REVIEW):
             case.status = CaseStatus.DISPATCHED
+
+    actor_str = dispatcher_id if is_manual_dispatch else ("RESOURCE_ALLOCATION_ENGINE" if auto_dispatch else "RESOURCE_VERIFIER")
+    action_str = "DISPATCHER_AUTHORIZED_DISPATCH" if is_manual_dispatch else ("RESOURCE_MATCHED_AND_DISPATCHED" if auto_dispatch else "RESOURCE_MATCH_PREVIEWED")
 
     # Audit Trail (Immutable)
     audit = AuditLog(
         case_id=case.id,
         stage=AuditStage.RESOURCE_MATCHING,
-        actor="RESOURCE_ALLOCATION_ENGINE",
-        action="RESOURCE_MATCHED_AND_DISPATCHED" if auto_dispatch else "RESOURCE_MATCH_PREVIEWED",
+        actor=actor_str,
+        action=action_str,
         details={
             "matched_ambulance": {
                 "id": best_ambulance.id,

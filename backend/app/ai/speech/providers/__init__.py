@@ -4,12 +4,14 @@ from app.ai.speech.providers.base import (
     SUPPORTED_AUDIO_EXTENSIONS,
     SUPPORTED_AUDIO_MIME_TYPES,
 )
+from app.ai.speech.providers.sarvam import SarvamSpeechProvider
 from app.ai.speech.providers.external import ExternalSpeechProvider
 from app.ai.speech.providers.mock import MockSpeechProvider
 from app.ai.speech.providers.factory import get_speech_provider
 
 __all__ = [
     "SpeechToTextProvider",
+    "SarvamSpeechProvider",
     "ExternalSpeechProvider",
     "MockSpeechProvider",
     "get_speech_provider",

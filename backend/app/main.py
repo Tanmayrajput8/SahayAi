@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
+from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
@@ -110,7 +112,8 @@ def create_application() -> FastAPI:
     @app.get("/track", tags=["Citizen Portal"])
     @app.get("/track/{case_id}", tags=["Citizen Portal"])
     @app.get("/citizen/status", tags=["Citizen Portal"])
-    def citizen_case_tracker(case_id: str = None):
+    def citizen_case_tracker(case_id: Optional[str] = None):
+
         if os.path.exists(citizen_track_html):
             return FileResponse(citizen_track_html)
         return {"name": settings.PROJECT_NAME, "message": "Citizen tracking UI not found."}

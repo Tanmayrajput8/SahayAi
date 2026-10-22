@@ -173,9 +173,9 @@ function renderMapLayers() {
     const focusedCase = activeCasesCache.find(c => c.id === currentFocusedCaseId);
     if (focusedCase && focusedCase.latitude && focusedCase.longitude) {
       const caseLatLng = [focusedCase.latitude, focusedCase.longitude];
-      const assignedAmb = ambulancesCache.find(a => a.assigned_case_id === focusedCase.id || (focusedCase.status === 'DISPATCHED' && a.status === 'ASSIGNED'))
-        || ambulancesCache[0];
-      const targetHosp = hospitalsCache[0];
+      const assignedAmb = focusedCase.assigned_ambulance
+        || ambulancesCache.find(a => a.assigned_case_id === focusedCase.id) || null;
+      const targetHosp = focusedCase.assigned_hospital || null;
 
       if (assignedAmb) {
         L.polyline([[assignedAmb.latitude, assignedAmb.longitude], caseLatLng], {

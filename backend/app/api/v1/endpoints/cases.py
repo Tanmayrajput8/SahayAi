@@ -1,14 +1,17 @@
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Form
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.case import Case, CaseStatus, SeverityLevel
+from app.models.ambulance import AmbulanceStatus
 from app.models.location import Location, GeocodingStatus
 from app.models.audit import AuditLog, AuditStage
-from app.schemas.case import CaseCreate, CaseResponse, CaseTriageResponse, CaseLocationUpdate
-from app.schemas.resource import ResourceMatchResult
+from app.core.config import settings
+from app.schemas.case import CaseCreate, CaseResponse, CaseTriageResponse, CaseLocationUpdate, DuplicateSignalBreakdown
+from app.schemas.resource import ResourceMatchResult, AmbulanceResponse, HospitalResponse
 from app.services.resource_verification import (
     verify_and_match_resources,
     ResourceVerificationError,
@@ -59,17 +62,20 @@ def reset_cases_demo(db: Session = Depends(get_db)):
 )
 def create_case(
     payload: CaseCreate,
+    auto_triage: bool = Query(default=False, description="Optionally trigger immediate triage and duplicate detection"),
     db: Session = Depends(get_db),
 ) -> CaseResponse:
     """
     Ingest a new emergency description.
     Stores raw input, modality, timestamp, and sets initial status to PENDING.
+    If auto_triage is True, triggers extraction and duplicate detection immediately.
     """
     logger.info(
-        "Emergency case received: modality=%s, caller=%s, length=%d",
+        "Emergency case received: modality=%s, caller=%s, length=%d, auto_triage=%s",
         payload.modality.value,
         payload.caller_phone or "anonymous",
         len(payload.raw_text or ""),
+        auto_triage,
     )
 
     # 1. Create Case record
@@ -121,6 +127,14 @@ def create_case(
     db.add(audit_entry)
     db.commit()
     db.refresh(new_case)
+
+    # 4. Trigger auto-triage and duplicate detection if requested
+    if auto_triage:
+        try:
+            process_case_extraction(case_id=new_case.id, db=db)
+            db.refresh(new_case)
+        except Exception as exc:
+            logger.warning("Auto-triage for case %s failed: %s", new_case.id, exc)
 
     return CaseResponse.model_validate(new_case)
 
@@ -178,6 +192,93 @@ def _build_case_triage_response(updated_case: Case) -> CaseTriageResponse:
     raw_output = extracted.raw_llm_output if extracted else {}
     is_failed = raw_output.get("status") == "FAILED" or (extracted and extracted.emergency_type == "EXTRACTION_FAILED")
 
+    # Active dispatch assignment details
+    assigned_amb = None
+    assigned_hosp = None
+    eta_min = None
+    amb_dist = None
+    hosp_dist = None
+    if getattr(updated_case, "resource_matches", None):
+        for rm in reversed(updated_case.resource_matches):
+            if getattr(rm, "is_dispatched", False):
+                if rm.ambulance:
+                    assigned_amb = AmbulanceResponse.model_validate(rm.ambulance)
+                if rm.hospital:
+                    assigned_hosp = HospitalResponse.model_validate(rm.hospital)
+                eta_min = rm.ambulance_eta_minutes
+                amb_dist = rm.ambulance_distance_km
+                hosp_dist = rm.hospital_distance_km
+                break
+
+    # Assemble real Duplicate Detection Signal Breakdown
+    dup_breakdown = None
+    if getattr(updated_case, "duplicate_of", None) and len(updated_case.duplicate_of) > 0:
+        dup = updated_case.duplicate_of[-1]
+        score_val = float(dup.overall_confidence)
+        status_str = "DUPLICATE" if score_val >= settings.DUPLICATE_THRESHOLD else ("POSSIBLE_DUPLICATE" if score_val >= settings.DUPLICATE_POSSIBLE_THRESHOLD else "NOT_DUPLICATE")
+        dist_val = float(dup.geographic_distance_km) if dup.geographic_distance_km is not None else None
+        loc_sim = max(0.0, 1.0 - ((dist_val or 0.0) / settings.DUPLICATE_LOCATION_RADIUS_KM)) if dist_val is not None else 0.0
+        time_diff = float(dup.temporal_diff_minutes)
+        time_sim = max(0.0, 1.0 - (time_diff / settings.DUPLICATE_TIME_WINDOW_MINUTES))
+        dup_breakdown = DuplicateSignalBreakdown(
+            status=status_str,
+            score=round(score_val, 4),
+            matched_case_id=dup.primary_case_id,
+            semantic_similarity=round(float(dup.semantic_similarity), 4),
+            geographic_distance_km=round(dist_val, 2) if dist_val is not None else None,
+            location_similarity=round(loc_sim, 4),
+            temporal_diff_minutes=round(time_diff, 1),
+            temporal_similarity=round(time_sim, 4),
+            emergency_type_similarity=round(float(dup.emergency_type_similarity), 4),
+            detection_method=dup.detection_method or "WEIGHTED_MULTISIGNAL",
+            formula="0.40*semantic + 0.30*location + 0.15*temporal + 0.15*type",
+            requires_review=status_str in ("DUPLICATE", "POSSIBLE_DUPLICATE"),
+            is_confirmed_duplicate=bool(dup.is_confirmed_duplicate),
+        )
+    elif getattr(updated_case, "duplicate_associations", None) and len(updated_case.duplicate_associations) > 0:
+        dup = updated_case.duplicate_associations[-1]
+        score_val = float(dup.overall_confidence)
+        status_str = "DUPLICATE" if score_val >= settings.DUPLICATE_THRESHOLD else ("POSSIBLE_DUPLICATE" if score_val >= settings.DUPLICATE_POSSIBLE_THRESHOLD else "NOT_DUPLICATE")
+        dist_val = float(dup.geographic_distance_km) if dup.geographic_distance_km is not None else None
+        loc_sim = max(0.0, 1.0 - ((dist_val or 0.0) / settings.DUPLICATE_LOCATION_RADIUS_KM)) if dist_val is not None else 0.0
+        time_diff = float(dup.temporal_diff_minutes)
+        time_sim = max(0.0, 1.0 - (time_diff / settings.DUPLICATE_TIME_WINDOW_MINUTES))
+        dup_breakdown = DuplicateSignalBreakdown(
+            status=status_str,
+            score=round(score_val, 4),
+            matched_case_id=dup.duplicate_case_id,
+            semantic_similarity=round(float(dup.semantic_similarity), 4),
+            geographic_distance_km=round(dist_val, 2) if dist_val is not None else None,
+            location_similarity=round(loc_sim, 4),
+            temporal_diff_minutes=round(time_diff, 1),
+            temporal_similarity=round(time_sim, 4),
+            emergency_type_similarity=round(float(dup.emergency_type_similarity), 4),
+            detection_method=dup.detection_method or "WEIGHTED_MULTISIGNAL",
+            formula="0.40*semantic + 0.30*location + 0.15*temporal + 0.15*type",
+            requires_review=status_str in ("DUPLICATE", "POSSIBLE_DUPLICATE"),
+            is_confirmed_duplicate=bool(dup.is_confirmed_duplicate),
+        )
+    elif getattr(updated_case, "audit_logs", None):
+        dup_audit = next((a for a in reversed(updated_case.audit_logs) if getattr(a, "stage", None) == AuditStage.DUPLICATE_CHECK), None)
+        if dup_audit and dup_audit.details:
+            d = dup_audit.details
+            dup_breakdown = DuplicateSignalBreakdown(
+                status=d.get("duplicate_status", "NOT_DUPLICATE"),
+                score=float(d.get("duplicate_score", 0.0)),
+                matched_case_id=d.get("candidate_case_id"),
+                semantic_similarity=float(d.get("semantic_similarity", 0.0)),
+                geographic_distance_km=float(d["geographic_distance_km"]) if d.get("geographic_distance_km") is not None else None,
+                location_similarity=float(d.get("location_similarity", 0.0)),
+                temporal_diff_minutes=float(d.get("temporal_diff_minutes", 0.0)),
+                temporal_similarity=float(d.get("temporal_similarity", 0.0)),
+                emergency_type_similarity=float(d.get("emergency_type_similarity", 0.0)),
+                detection_method=d.get("detection_method", "WEIGHTED_MULTISIGNAL"),
+                formula=d.get("formula", "0.40*semantic + 0.30*location + 0.15*temporal + 0.15*type"),
+                requires_review=d.get("duplicate_status") in ("DUPLICATE", "POSSIBLE_DUPLICATE", "INSUFFICIENT_EVIDENCE"),
+                policy_notes=d.get("missing_data_policy_applied"),
+                is_confirmed_duplicate=False,
+            )
+
     return CaseTriageResponse(
         id=updated_case.id,
         status=updated_case.status,
@@ -217,8 +318,35 @@ def _build_case_triage_response(updated_case: Case) -> CaseTriageResponse:
         geocoding_provider=loc.geocoding_provider if loc else None,
         is_location_verified=loc.is_verified if loc else False,
         location_error=loc.error_message if loc else None,
+        assigned_ambulance=assigned_amb,
+        assigned_hospital=assigned_hosp,
+        eta_minutes=eta_min,
+        ambulance_distance_km=amb_dist,
+        hospital_distance_km=hosp_dist,
+        duplicate_detection=dup_breakdown,
         updated_at=updated_case.updated_at,
     )
+
+
+@router.get(
+    "/{case_id}/duplicates",
+    response_model=Optional[DuplicateSignalBreakdown],
+    summary="Get Case Duplicate Detection Signals (Staff Dossier)",
+    description="Retrieve real calculated signals (semantic, distance, temporal, type similarity, and weighted formula) for staff inspection.",
+)
+def get_case_duplicates(
+    case_id: str,
+    db: Session = Depends(get_db),
+) -> Optional[DuplicateSignalBreakdown]:
+    """Retrieve full duplicate detection signal breakdown for staff inspection."""
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "not_found", "message": f"Emergency case '{case_id}' not found."},
+        )
+    resp = _build_case_triage_response(case)
+    return resp.duplicate_detection
 
 
 @router.post(
@@ -258,6 +386,8 @@ async def submit_audio_case(
     caller_phone: Optional[str] = Form(default=None),
     manual_location: Optional[str] = Form(default=None),
     language_hint: Optional[str] = Form(default=None),
+    latitude: Optional[float] = Form(default=None),
+    longitude: Optional[float] = Form(default=None),
     db: Session = Depends(get_db),
 ) -> CaseTriageResponse:
     """Ingest voice emergency, transcribe, and route through downstream intelligence pipeline."""
@@ -270,6 +400,8 @@ async def submit_audio_case(
             caller_phone=caller_phone,
             manual_location=manual_location,
             language_hint=language_hint,
+            latitude=latitude,
+            longitude=longitude,
             db=db,
         )
     except EmptyAudioError as exc:
@@ -323,6 +455,12 @@ def update_case_location(
     return _build_case_triage_response(case)
 
 
+class CaseStatusUpdateRequest(BaseModel):
+    status: CaseStatus
+    notes: Optional[str] = None
+    dispatcher_id: Optional[str] = "dispatcher_1"
+
+
 @router.post(
     "/{case_id}/dispatch",
     response_model=ResourceMatchResult,
@@ -338,6 +476,8 @@ def update_case_location(
 def dispatch_case_resources(
     case_id: str,
     strict_ambulance_type: bool = Query(default=False, description="Strict BLS/ALS match requirement"),
+    manual: bool = Query(default=True, description="Whether this is an explicit human dispatcher dispatch authorization"),
+    dispatcher_id: Optional[str] = Query(default="dispatcher_1", description="Identifier of the human dispatcher"),
     db: Session = Depends(get_db),
 ) -> ResourceMatchResult:
     """Trigger simulated ambulance and hospital matching for the case."""
@@ -354,6 +494,8 @@ def dispatch_case_resources(
             db=db,
             strict_ambulance_type=strict_ambulance_type,
             auto_dispatch=True,
+            is_manual_dispatch=manual,
+            dispatcher_id=dispatcher_id,
         )
         return match_result
 
@@ -377,6 +519,71 @@ def dispatch_case_resources(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"error": exc.code, "message": exc.message, "details": exc.details},
         )
+
+
+@router.patch(
+    "/{case_id}/status",
+    response_model=CaseTriageResponse,
+    summary="Update Emergency Case Progression Status",
+    description="Transition case status (e.g. ARRIVED, RESOLVED, CANCELLED) and synchronize fleet units and audit logs.",
+)
+def update_case_status(
+    case_id: str,
+    payload: CaseStatusUpdateRequest,
+    db: Session = Depends(get_db),
+) -> CaseTriageResponse:
+    """Transition emergency case status with automatic fleet ambulance synchronization and audit recording."""
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "not_found", "message": f"Emergency case '{case_id}' not found."},
+        )
+
+    previous_status = case.status
+    case.status = payload.status
+
+    # Locate any dispatched fleet ambulance assigned to this case
+    assigned_amb = None
+    if case.resource_matches:
+        for rm in reversed(case.resource_matches):
+            if getattr(rm, "is_dispatched", False) and rm.ambulance:
+                assigned_amb = rm.ambulance
+                break
+
+    # Synchronize ambulance fleet status
+    if payload.status == CaseStatus.ARRIVED:
+        if assigned_amb:
+            assigned_amb.status = AmbulanceStatus.ARRIVED
+        action_name = "AMBULANCE_ARRIVED_AT_SCENE"
+    elif payload.status in (CaseStatus.RESOLVED, CaseStatus.CANCELLED):
+        if assigned_amb:
+            assigned_amb.status = AmbulanceStatus.AVAILABLE
+        action_name = "EMERGENCY_CASE_RESOLVED" if payload.status == CaseStatus.RESOLVED else "EMERGENCY_CASE_CANCELLED"
+    elif payload.status == CaseStatus.DISPATCHED:
+        if assigned_amb:
+            assigned_amb.status = AmbulanceStatus.DISPATCHED
+        action_name = "EMERGENCY_CASE_DISPATCHED"
+    else:
+        action_name = f"CASE_STATUS_CHANGED_TO_{payload.status.value}"
+
+    audit_entry = AuditLog(
+        case_id=case.id,
+        stage=AuditStage.RESOURCE_MATCHING,
+        actor=payload.dispatcher_id or "DISPATCHER_CONSOLE",
+        action=action_name,
+        details={
+            "previous_status": previous_status.value,
+            "new_status": payload.status.value,
+            "notes": payload.notes,
+            "ambulance_id": assigned_amb.id if assigned_amb else None,
+            "vehicle_number": assigned_amb.vehicle_number if assigned_amb else None,
+        },
+    )
+    db.add(audit_entry)
+    db.commit()
+    db.refresh(case)
+    return _build_case_triage_response(case)
 
 
 

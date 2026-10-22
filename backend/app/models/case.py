@@ -17,6 +17,7 @@ class SeverityLevel(str, enum.Enum):
 class AmbulanceType(str, enum.Enum):
     ALS = "ALS"
     BLS = "BLS"
+    UNKNOWN = "UNKNOWN"
 
 
 class InputModality(str, enum.Enum):
@@ -30,6 +31,7 @@ class CaseStatus(str, enum.Enum):
     TRIAGED = "TRIAGED"
     UNDER_REVIEW = "UNDER_REVIEW"
     DISPATCHED = "DISPATCHED"
+    ARRIVED = "ARRIVED"
     RESOLVED = "RESOLVED"
     CANCELLED = "CANCELLED"
     DUPLICATE = "DUPLICATE"
@@ -49,11 +51,12 @@ class Case(Base, TimestampMixin):
 
     @property
     def raw_input(self) -> str:
-        return str(self.raw_text)
+        return (self.raw_text)
 
     # Relationships
-    extracted_info = relationship("ExtractedInfo", back_populates="case", uselist=False, cascade="all, delete-orphan")
-    location = relationship("Location", back_populates="case", uselist=False, cascade="all, delete-orphan")
+    extracted_info = relationship("ExtractedInfo", back_populates="case", uselist=False, cascade="all, delete-orphan", single_parent=True)
+    location = relationship("Location", back_populates="case", uselist=False, cascade="all, delete-orphan", single_parent=True)
+
     resource_matches = relationship("ResourceMatch", back_populates="case", cascade="all, delete-orphan")
     ai_decisions = relationship("AIDecision", back_populates="case", cascade="all, delete-orphan")
     verification_results = relationship("VerificationResult", back_populates="case", cascade="all, delete-orphan")

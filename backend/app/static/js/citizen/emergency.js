@@ -92,10 +92,10 @@ function setupGPSDetection() {
     const lonInput = document.getElementById('citizenLon');
 
     if (!navigator.geolocation) {
-      latInput.value = '18.5204';
-      lonInput.value = '73.8567';
-      if (!locInput.value) locInput.value = 'Pune City Center (GPS Simulated)';
-      Utils.showToast('Browser does not support geolocation. Defaulted to Pune.', 'warning');
+      if (!locInput.value) locInput.value = '';
+      latInput.value = '';
+      lonInput.value = '';
+      Utils.showToast('Browser does not support GPS. Please type your location in the address field.', 'warning');
       return;
     }
 
@@ -116,14 +116,12 @@ function setupGPSDetection() {
       },
       err => {
         console.warn('Geolocation error:', err);
-        // Fallback to Pune coordinates for prototype demonstration
-        latInput.value = '18.5204';
-        lonInput.value = '73.8567';
-        if (!locInput.value) locInput.value = 'Pune Central (Shivajinagar)';
+        // DO NOT inject fake coordinates. Leave fields blank and ask user to enter location manually.
+        latInput.value = '';
+        lonInput.value = '';
         btn.disabled = false;
-        btn.innerHTML = '📍 Pune (Fallback)';
-        Utils.showToast('GPS permission denied or timeout. Using Pune landmark fallback.', 'info');
-        setTimeout(() => { btn.innerHTML = '📍 Use My Location'; }, 3500);
+        btn.innerHTML = '📍 Use My Location';
+        Utils.showToast('GPS unavailable or permission denied. Please type your location in the address field below.', 'warning');
       },
       { timeout: 7000 }
     );
@@ -270,6 +268,8 @@ async function setupIntakeSubmission() {
         if (phone) formData.append('caller_phone', phone);
         if (locationText) formData.append('manual_location', locationText);
         if (language) formData.append('language_hint', language);
+        if (lat !== null && !isNaN(lat)) formData.append('latitude', lat);
+        if (lon !== null && !isNaN(lon)) formData.append('longitude', lon);
 
         const audioResult = await window.api.submitAudioCase(formData);
         caseId = audioResult.id;
@@ -310,7 +310,7 @@ async function setupIntakeSubmission() {
 
       // Step 4: Spatial Matching & Ambulance Dispatch
       updateStep('dispatch', 'Resource Verification & Dispatch', 'running', 'Locating nearest available ambulance…');
-      const dispatchResult = await window.api.dispatchCase(caseId).catch(e => {
+      const dispatchResult = await window.api.dispatchCase(caseId, false, 'citizen_portal', false).catch(e => {
         console.warn('Dispatch match:', e);
         return null;
       });

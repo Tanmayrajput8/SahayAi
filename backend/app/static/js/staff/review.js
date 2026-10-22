@@ -57,8 +57,9 @@ async function loadReviewQueue() {
             ${Utils.formatTime(item.created_at)}
           </td>
           <td style="font-weight:600; color:var(--text-primary); max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${Utils.escapeHtml(item.emergency_type || 'General')}
+            ${Utils.escapeHtml(item.emergency_type || 'Under Review')}
           </td>
+
           <td>${Utils.getPriorityBadge(item.priority)}</td>
           <td style="max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${Utils.escapeHtml(item.raw_text)}">
             ${Utils.escapeHtml(item.raw_text)}

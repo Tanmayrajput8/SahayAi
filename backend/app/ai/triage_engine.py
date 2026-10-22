@@ -38,15 +38,18 @@ PROTOTYPE_AMBULANCE_MAP = {
     SeverityLevel.HIGH: AmbulanceType.ALS,
     SeverityLevel.MODERATE: AmbulanceType.BLS,
     SeverityLevel.LOW: AmbulanceType.BLS,
-    SeverityLevel.UNKNOWN: AmbulanceType.ALS,  # Safe failure default: ALS + mandatory review
+    SeverityLevel.UNKNOWN: AmbulanceType.UNKNOWN,  # UNKNOWN must NOT become ALS
 }
 
 # Critical red flag markers that mandate ALS regardless of LLM suggestion
 CRITICAL_SYMPTOM_MARKERS = [
-    "cardiac arrest", "chest pain", "heart attack", "unconscious", "collapsed",
+    "cardiac arrest", "cardiac collapse", "cardiac", "chest pain", "heart attack",
+    "unconscious", "collapsed", "collapse", "in shock",
     "not breathing", "stopped breathing", "gasping", "arterial bleeding",
     "severe hemorrhage", "head trauma", "crushed", "choking", "seizure",
     "stroke", "paralysis", "anaphylaxis", "severe burns",
+    "हृदयविकाराचा झटका", "हार्ट अटॅक", "दिल का दौरा", "बेहोश", "बेशुद्ध",
+    "श्वास बंद", "सांस बंद", "रक्तस्राव", "पक्षाघात", "लकवा"
 ]
 
 
@@ -163,12 +166,13 @@ def evaluate_hybrid_triage(
 
     # -------------------------------------------------------------------------
     # Rule 6: Authoritative Prototype Ambulance Mapping
-    # Critical → ALS, High → ALS, Moderate → BLS, Low → BLS, Unknown → ALS + review
+    # Critical → ALS, High → ALS, Moderate → BLS, Low → BLS, Unknown → UNKNOWN + review
     # -------------------------------------------------------------------------
-    rule_ambulance = PROTOTYPE_AMBULANCE_MAP.get(rule_severity, AmbulanceType.ALS)
+    rule_ambulance = PROTOTYPE_AMBULANCE_MAP.get(rule_severity, AmbulanceType.UNKNOWN)
 
     if rule_severity == SeverityLevel.UNKNOWN:
-        review_triggers.append("Unknown emergency classification assigned default ALS ambulance with mandatory human review.")
+        rule_ambulance = AmbulanceType.UNKNOWN
+        review_triggers.append("Clinical assessment is UNKNOWN due to insufficient information. Mandatory human dispatcher review is required.")
 
     # -------------------------------------------------------------------------
     # Rule 7: Conflict Detection & Reconciliation (LLM vs Deterministic Engine)
@@ -192,17 +196,26 @@ def evaluate_hybrid_triage(
     # If LLM proposed BLS but deterministic rule requires ALS (safety override)
     if ai_amb == AmbulanceType.BLS and rule_ambulance == AmbulanceType.ALS:
         overrides.append("Deterministic safety override: Upgraded ambulance from BLS to ALS.")
+    elif rule_severity == SeverityLevel.UNKNOWN or rule_ambulance == AmbulanceType.UNKNOWN:
+        overrides.append("AI recommendation differs from deterministic assessment. Available clinical information is insufficient for automatic dispatch. Human dispatcher review is required.")
 
     if has_conflict:
         review_triggers.append("Discrepancy detected between LLM recommendation and deterministic rule engine.")
 
-    # Final consolidated decisions: deterministic rules take precedence for patient safety
-    final_severity = rule_severity
-    final_ambulance = rule_ambulance
+    # Final consolidated decisions:
+    # UNKNOWN MUST NOT become ALS or BLS. It remains UNKNOWN with mandatory review.
+    if rule_severity == SeverityLevel.UNKNOWN or rule_ambulance == AmbulanceType.UNKNOWN:
+        final_severity = SeverityLevel.UNKNOWN
+        final_ambulance = AmbulanceType.UNKNOWN
+    else:
+        final_severity = rule_severity
+        final_ambulance = rule_ambulance
 
-    # Mandatory review if severity is UNKNOWN or conflicts exist or confidence is low
+    # Mandatory review if severity or ambulance is UNKNOWN or conflicts exist or confidence is low
     mandatory_review = (
         final_severity == SeverityLevel.UNKNOWN
+        or final_ambulance == AmbulanceType.UNKNOWN
+        or has_conflict
         or bool(review_triggers)
         or extraction.confidence_score < 0.75
     )

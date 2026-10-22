@@ -102,10 +102,11 @@ function filterAndRenderCases() {
           📍 ${Utils.escapeHtml(c.extracted_location || 'Pune')}
         </td>
         <td style="font-weight:600; color:var(--text-primary); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-          ${Utils.escapeHtml(c.emergency_type || 'General')}
+          ${Utils.escapeHtml(c.emergency_type || 'Assessing...')}
         </td>
         <td>${Utils.getPriorityBadge(c.priority)}</td>
-        <td><span style="font-size:0.8rem; font-weight:700; color:var(--accent-cyan);">${Utils.escapeHtml(c.recommended_ambulance || 'ALS')}</span></td>
+        <td><span style="font-size:0.8rem; font-weight:700; color:var(--accent-cyan);">${Utils.escapeHtml(c.recommended_ambulance === 'UNKNOWN' ? 'UNKNOWN / REVIEW REQUIRED' : (c.recommended_ambulance || 'PENDING'))}</span></td>
+
         <td style="min-width:100px;">
           <div style="font-size:0.75rem; font-weight:600; margin-bottom:2px;">${(confScore * 100).toFixed(0)}%</div>
           <div class="conf-bar-wrap">

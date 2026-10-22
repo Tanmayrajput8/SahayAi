@@ -39,11 +39,12 @@ function renderFairnessData(data) {
   const breakdown = data.language_breakdown || {};
 
   if (!Object.keys(breakdown).length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:32px;">${Utils.renderEmptyState('No demographic evaluation records generated yet.', '⚖️')}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:32px;">${Utils.renderEmptyState('No demographic evaluation records generated yet.', '⚖️')}</td></tr>`;
     return;
   }
 
   tbody.innerHTML = Object.entries(breakdown).map(([lang, m]) => {
+    const emAcc = m.emergency_type_accuracy !== null && m.emergency_type_accuracy !== undefined ? m.emergency_type_accuracy : 0.0;
     const sevAcc = m.severity_accuracy !== null && m.severity_accuracy !== undefined ? m.severity_accuracy : 0.0;
     const ambAcc = m.ambulance_accuracy !== null && m.ambulance_accuracy !== undefined ? m.ambulance_accuracy : 0.0;
     const locRate = m.location_extraction_rate !== null && m.location_extraction_rate !== undefined ? m.location_extraction_rate : 0.0;
@@ -53,7 +54,15 @@ function renderFairnessData(data) {
         <td>
           <strong style="color:var(--text-primary); font-size:0.92rem;">${Utils.escapeHtml(lang)}</strong>
         </td>
-        <td><strong>${m.total_cases || 0}</strong></td>
+        <td><strong>${m.total_samples || m.total_cases || 0}</strong></td>
+        <td>
+          <div style="font-weight:700; color:${emAcc >= 0.85 ? 'var(--accent-emerald)' : 'var(--accent-amber)'};">
+            ${Utils.formatPercent(emAcc)}
+          </div>
+          <div class="conf-bar-wrap">
+            <div class="conf-bar" style="width:${(emAcc * 100).toFixed(0)}%; background:${emAcc >= 0.85 ? 'var(--accent-emerald)' : 'var(--accent-amber)'};"></div>
+          </div>
+        </td>
         <td>
           <div style="font-weight:700; color:${sevAcc >= 0.85 ? 'var(--accent-emerald)' : 'var(--accent-amber)'};">
             ${Utils.formatPercent(sevAcc)}
@@ -79,13 +88,14 @@ function renderFairnessData(data) {
           ${m.avg_latency_ms ? `${m.avg_latency_ms.toFixed(0)} ms` : '—'}
         </td>
         <td>
-          <span class="badge ${sevAcc >= 0.85 ? 'badge-low' : 'badge-moderate'}">
-            ${sevAcc >= 0.85 ? 'PARITY VERIFIED' : 'ACCEPTABLE RANGE'}
+          <span class="badge ${sevAcc >= 0.85 && emAcc >= 0.85 ? 'badge-low' : 'badge-moderate'}">
+            ${sevAcc >= 0.85 && emAcc >= 0.85 ? 'PARITY VERIFIED' : 'ACCEPTABLE RANGE'}
           </span>
         </td>
       </tr>
     `;
   }).join('');
+
 }
 
 async function runFairnessEval() {

@@ -7,6 +7,8 @@ from app.ai.providers.grok import GrokProvider
 from app.ai.schemas import EmergencyExtractionResult
 from app.ai.exceptions import LLMTimeoutError, LLMAPIError, LLMOutputFormatError
 from app.models.case import SeverityLevel, AmbulanceType
+from app.ai.normalization import normalize_medical_text
+
 
 logger = logging.getLogger(__name__)
 
@@ -71,37 +73,17 @@ class MockProvider(GrokProvider):
         text = raw_text.strip()
         lower = text.lower()
 
-        # 2. Language Detection
-        is_devanagari = bool(re.search(r"[\u0900-\u097F]", text))
-        detected_language = "English"
-
-        if is_devanagari:
-            # Check Marathi markers vs Hindi markers
-            marathi_markers = ["आहे", "झाला", "पडली", "जवळ", "त्रास", "बेशुद्ध", "अपघात", "रक्त", "लवकर"]
-            hindi_markers = ["है", "हुआ", "रहा", "बह", "भेजो", "खून", "मदद", "गिर"]
-            if any(m in text for m in marathi_markers):
-                detected_language = "Marathi"
-            elif any(m in text for m in hindi_markers):
-                detected_language = "Hindi"
-            else:
-                detected_language = "Hindi / Marathi (Devanagari)"
-        else:
-            # Romanized markers
-            marathish_markers = ["zala", "ahe", "baher", "madat", "kuthla"]
-            hinglish_markers = ["bhai", "jaldi", "gayi", "bohot", "nikal", "pe", "chahiye", "ho gaya", "karo"]
-            if any(m in lower for m in marathish_markers):
-                detected_language = "Code-Mixed (Marathi-English)"
-            elif any(m in lower for m in hinglish_markers):
-                detected_language = "Code-Mixed (Hinglish)"
-            elif any(slang in lower for slang in ["plzz", "hlp", "accidnt", "some1", "bleedin", "brdr"]):
-                detected_language = "English (Slang/Typos)"
+        # 2. Medical Terminology Normalization & Language Detection
+        norm = normalize_medical_text(text, language_hint=context.get("language_hint") if context else None)
+        detected_language = norm.detected_language
 
         # 3. Location Extraction
         known_locations = [
             "Marine Drive", "Nariman Point", "Dadar Station", "Dadar", "Andheri Station",
             "Andheri", "Kurla Signal", "Kurla", "Swargate", "Kothrud", "Bandra West",
             "Bandra", "Western Express Highway", "MG Road", "Station", "Signal", "Depot",
-            "Shivajinagar", "FC Road", "Deccan", "Pune", "Mumbai",
+            "Shivajinagar", "FC Road", "Deccan", "Pune", "Mumbai", "Katraj", "Hadapsar",
+            "Dhankawadi", "Hinjewadi", "Aundh", "Baner"
         ]
         extracted_location: Optional[str] = None
         for loc in known_locations:
@@ -117,6 +99,18 @@ class MockProvider(GrokProvider):
                 extracted_location = "दादर स्टेशन (Dadar Station)"
             elif "कुर्ला" in text:
                 extracted_location = "कुर्ला (Kurla)"
+            elif "कोथरूड" in text:
+                extracted_location = "कोथरूड (Kothrud)"
+            elif "स्वारगेट" in text:
+                extracted_location = "स्वारगेट (Swargate)"
+            elif "डेक्कन" in text:
+                extracted_location = "डेक्कन (Deccan)"
+            elif "शिवाजीनगर" in text:
+                extracted_location = "शिवाजीनगर (Shivajinagar)"
+            elif "हडपसर" in text:
+                extracted_location = "हडपसर (Hadapsar)"
+            elif "कात्रज" in text:
+                extracted_location = "कात्रज (Katraj)"
 
         # 4. Contradiction Detection
         is_contradictory = False
@@ -125,52 +119,69 @@ class MockProvider(GrokProvider):
             is_contradictory = True
             contradiction_notes = "Contradiction detected: caller reports mutually incompatible clinical states."
 
-        # 5. Symptoms & Emergency Type Classification
+        # 5. Symptoms & Emergency Type Classification using Medical Normalization
         symptoms: List[str] = []
         missing_info: List[str] = []
-        conscious_status = "unknown"
-        breathing_status = "unknown"
+        conscious_status = norm.conscious_status
+        breathing_status = norm.breathing_status
 
-        # Check consciousness
-        if any(w in lower for w in ["unconscious", "fainted", "collapsed", "बेशुद्ध", "बेहोश"]):
-            conscious_status = "unconscious"
-            symptoms.append("loss of consciousness")
-        elif "conscious" in lower:
-            conscious_status = "conscious"
+        # Collect clinical concepts into symptoms
+        for c in norm.all_concepts:
+            if c.standardized_text not in symptoms:
+                symptoms.append(c.standardized_text)
 
-        # Check breathing
-        if any(w in lower for w in ["not breathing", "stopped breathing", "choking"]):
-            breathing_status = "stopped"
-            symptoms.append("respiratory arrest")
-        elif any(w in lower for w in ["difficulty breathing", "shortness of breath", "त्रास", "दम"]):
-            breathing_status = "difficulty"
-            symptoms.append("dyspnea")
+        # Primary Emergency Type Mapping
+        from app.ai.normalization.schemas import EmergencyTypeStr
 
-        # Check bleeding
-        if any(w in lower for w in ["bleeding", "bleedin", "bleding", "blood", "खून", "रक्त"]):
-            symptoms.append("hemorrhage / active bleeding")
-
-        # Determine Emergency Type
-        if any(w in lower for w in ["cardiac", "chest pain", "heart", "छाती"]):
-            emergency_type = "Cardiac Emergency"
-            symptoms.append("acute chest pain")
-        elif any(w in lower or w in text for w in ["accident", "accidnt", "acident", "collision", "crash", "slip", "अपघात", "दुर्घटना", "एक्सीडेंट", "टक्कर"]):
-            emergency_type = "Road Traffic Accident"
-            symptoms.append("trauma / impact injury")
-        elif any(w in lower for w in ["burn", "fire", "आग"]):
-            emergency_type = "Burn Injury"
-            symptoms.append("thermal burn")
-        elif any(w in lower for w in ["fall", "fell down", "गिर"]):
-            emergency_type = "Trauma / Fall"
-            symptoms.append("fall from standing")
-        elif any(w in lower for w in ["stroke", "paralysis"]):
-            emergency_type = "Suspected Stroke"
-            symptoms.append("neurological deficit")
+        if norm.primary_category == "CARDIAC":
+            emergency_type = EmergencyTypeStr("Cardiac Emergency")
+            if "acute chest pain" not in symptoms and "reported heart attack" not in symptoms:
+                symptoms.append("acute chest pain")
+        elif norm.primary_category == "STROKE":
+            emergency_type = EmergencyTypeStr("Suspected Stroke")
+            if "neurological deficit" not in symptoms:
+                symptoms.append("neurological deficit")
+        elif norm.primary_category == "BURN":
+            emergency_type = EmergencyTypeStr("Burn Injury")
+            if "thermal burn" not in symptoms:
+                symptoms.append("thermal burn")
+        elif norm.primary_category == "RESPIRATORY":
+            emergency_type = EmergencyTypeStr("Respiratory Emergency")
+            if "breathing difficulty" not in symptoms:
+                symptoms.append("breathing difficulty")
+        elif norm.primary_category == "BLEEDING":
+            emergency_type = EmergencyTypeStr("Severe Bleeding / Trauma")
+            if "severe hemorrhage" not in symptoms:
+                symptoms.append("severe hemorrhage")
+        elif norm.primary_category == "ROAD_TRAFFIC_ACCIDENT":
+            emergency_type = EmergencyTypeStr("Road Traffic Accident")
+            if "trauma / impact injury" not in symptoms:
+                symptoms.append("trauma / impact injury")
+        elif norm.primary_category == "TRAUMA":
+            emergency_type = EmergencyTypeStr("Trauma / Fall")
+            if "fall injury" not in symptoms:
+                symptoms.append("fall injury")
+        elif norm.is_vague:
+            emergency_type = EmergencyTypeStr("General Medical Emergency")
+            if "reported distress" not in symptoms:
+                symptoms.append("reported distress")
         else:
-            emergency_type = "General Medical Emergency"
+            emergency_type = EmergencyTypeStr("General Medical Emergency")
+            if not symptoms:
+                symptoms.append("reported distress")
+
+        # Check typos and slang for prototype test resilience
+        if "accidnt" in lower or "acident" in lower:
+            emergency_type = EmergencyTypeStr("Road Traffic Accident")
+            if "trauma / impact injury" not in symptoms:
+                symptoms.append("trauma / impact injury")
+        if "bleedin" in lower or "bleed" in lower:
+            if not any("bleeding" in s or "hemorrhage" in s for s in symptoms):
+                symptoms.append("active bleeding / hemorrhage")
 
         if not symptoms:
             symptoms.append("reported distress")
+
 
         # 6. Patient Count
         patient_count = 1
@@ -197,8 +208,12 @@ class MockProvider(GrokProvider):
         if conscious_status == "unconscious" or breathing_status == "stopped" or emergency_type == "Cardiac Emergency":
             severity = SeverityLevel.CRITICAL
             ambulance = AmbulanceType.ALS
-            rationale = "Immediate life-threat (cardiac, unconsciousness, or respiratory failure) requires ALS ambulance."
-        elif "severe" in lower or emergency_type == "Road Traffic Accident" or breathing_status == "difficulty":
+            rationale = "Immediate life-threat (cardiac, unconsciousness, or respiratory arrest) requires ALS ambulance."
+        elif norm.is_vague:
+            severity = SeverityLevel.UNKNOWN
+            ambulance = AmbulanceType.UNKNOWN
+            rationale = "Clinical information in caller narrative is vague or insufficient for automated dispatch. Mandatory dispatcher review required."
+        elif "severe" in lower or emergency_type in ("Road Traffic Accident", "Respiratory Emergency", "Burn Injury", "Severe Bleeding / Trauma", "Suspected Stroke") or breathing_status == "difficulty":
             severity = SeverityLevel.HIGH
             ambulance = AmbulanceType.ALS
             rationale = "High acuity event with risk of rapid deterioration. ALS ambulance recommended."
@@ -216,6 +231,8 @@ class MockProvider(GrokProvider):
 
         # Confidence Scoring
         confidence = 0.88
+        if norm.is_vague:
+            confidence = 0.50
         if not extracted_location:
             confidence -= 0.15
         if len(missing_info) >= 2:
@@ -240,4 +257,6 @@ class MockProvider(GrokProvider):
             confidence_score=round(confidence, 2),
             is_contradictory=is_contradictory,
             contradiction_notes=contradiction_notes,
+            evidence=list(norm.evidence),
+            normalized_medical_text=norm.normalized_medical_text,
         )

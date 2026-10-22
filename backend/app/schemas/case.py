@@ -3,6 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 from app.models.case import CaseStatus, SeverityLevel, InputModality
+from app.schemas.resource import AmbulanceResponse, HospitalResponse
 
 
 class CaseCreate(BaseModel):
@@ -101,6 +102,24 @@ class CaseResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class DuplicateSignalBreakdown(BaseModel):
+    """Real calculated multi-signal duplicate detection details for staff inspection."""
+    status: str = "NOT_DUPLICATE"
+    score: float = 0.0
+    matched_case_id: Optional[str] = None
+    semantic_similarity: float = 0.0
+    geographic_distance_km: Optional[float] = None
+    location_similarity: float = 0.0
+    temporal_diff_minutes: float = 0.0
+    temporal_similarity: float = 0.0
+    emergency_type_similarity: float = 0.0
+    detection_method: str = "WEIGHTED_MULTISIGNAL"
+    formula: str = "0.40*semantic + 0.30*location + 0.15*temporal + 0.15*type"
+    requires_review: bool = False
+    policy_notes: Optional[str] = None
+    is_confirmed_duplicate: bool = False
+
+
 class CaseTriageResponse(BaseModel):
     """Rich schema returned after AI extraction and clinical triage."""
     id: str
@@ -139,6 +158,13 @@ class CaseTriageResponse(BaseModel):
     geocoding_provider: Optional[str] = None
     is_location_verified: bool = False
     location_error: Optional[str] = None
+    # Real dispatch assignment fields (from actual verified resource match)
+    assigned_ambulance: Optional[AmbulanceResponse] = None
+    assigned_hospital: Optional[HospitalResponse] = None
+    eta_minutes: Optional[float] = None
+    ambulance_distance_km: Optional[float] = None
+    hospital_distance_km: Optional[float] = None
+    duplicate_detection: Optional[DuplicateSignalBreakdown] = None
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

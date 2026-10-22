@@ -13,19 +13,27 @@ logger = logging.getLogger(__name__)
 def get_llm_provider(provider_override: Optional[str] = None) -> LLMProvider:
     """
     Retrieve the configured LLMProvider instance.
-    Supports 'grok' and 'mock'. If 'grok' is configured without an API key,
-    it logs a warning and gracefully defaults to MockProvider.
+    Supports 'groq', 'grok', and 'mock'. If 'groq' or 'grok' is configured without
+    an API key, it logs a warning and gracefully defaults to MockProvider.
     """
-    choice = (provider_override or settings.LLM_PROVIDER or "mock").strip().lower()
+    choice = (provider_override or settings.LLM_PROVIDER or "groq").strip().lower()
 
-    if choice == "grok":
-        if not settings.GROK_API_KEY:
-            logger.warning("GROK_API_KEY is empty. Falling back to MockProvider for offline research prototype.")
+    if choice in ("groq", "grok"):
+        api_key = settings.GROQ_API_KEY or settings.GROK_API_KEY
+        api_url = settings.GROQ_API_URL if choice == "groq" else settings.GROK_API_URL
+        model = settings.GROQ_MODEL if choice == "groq" else settings.GROK_MODEL
+
+        if not api_key:
+            logger.warning(
+                "%s_API_KEY is empty. Falling back to MockProvider for offline research prototype.",
+                choice.upper(),
+            )
             return MockProvider()
+
         return GrokProvider(
-            api_key=settings.GROK_API_KEY,
-            api_url=settings.GROK_API_URL,
-            model=settings.GROK_MODEL,
+            api_key=api_key,
+            api_url=api_url,
+            model=model,
             timeout=settings.LLM_TIMEOUT_SECONDS,
             max_retries=settings.LLM_MAX_RETRIES,
         )

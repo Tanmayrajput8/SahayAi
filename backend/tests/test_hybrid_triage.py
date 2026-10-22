@@ -125,21 +125,22 @@ def test_prototype_category_mapping_low_to_bls():
     assert PROTOTYPE_AMBULANCE_MAP[SeverityLevel.LOW] == AmbulanceType.BLS
 
 
-def test_prototype_category_mapping_unknown_to_als_and_mandatory_review():
-    """Unknown severity must map to ALS + mandatory human review."""
+def test_prototype_category_mapping_unknown_to_unknown_and_mandatory_review():
+    """Unknown severity must map to UNKNOWN + mandatory human review (UNKNOWN MUST NOT become ALS)."""
     extraction = EmergencyExtractionResult(
         emergency_type="Unknown",
         symptoms=[],
         location="Unknown",
         severity=SeverityLevel.UNKNOWN,
-        ambulance_requirement=AmbulanceType.ALS,
+        ambulance_requirement=AmbulanceType.UNKNOWN,
         clinical_rationale="Unclassifiable emergency.",
     )
     res = evaluate_hybrid_triage(extraction, "Something is happening here!")
     assert res.final_severity == SeverityLevel.UNKNOWN
-    assert res.final_ambulance == AmbulanceType.ALS
+    assert res.final_ambulance == AmbulanceType.UNKNOWN
     assert res.mandatory_human_review is True
-    assert PROTOTYPE_AMBULANCE_MAP[SeverityLevel.UNKNOWN] == AmbulanceType.ALS
+    assert PROTOTYPE_AMBULANCE_MAP[SeverityLevel.UNKNOWN] == AmbulanceType.UNKNOWN
+
 
 
 # ===========================================================================
@@ -170,7 +171,7 @@ def test_prototype_disclaimer_and_labeling():
 # ===========================================================================
 
 def test_handle_missing_symptoms():
-    """When symptoms are completely missing, rule engine assigns UNKNOWN + ALS + review."""
+    """When symptoms are completely missing, rule engine assigns UNKNOWN + UNKNOWN + review."""
     extraction = EmergencyExtractionResult(
         emergency_type="General Medical Emergency",
         symptoms=[],  # Missing symptoms
@@ -180,7 +181,7 @@ def test_handle_missing_symptoms():
     )
     res = evaluate_hybrid_triage(extraction, "Send ambulance to Dadar station immediately!")
     assert res.final_severity == SeverityLevel.UNKNOWN
-    assert res.final_ambulance == AmbulanceType.ALS
+    assert res.final_ambulance == AmbulanceType.UNKNOWN
     assert res.mandatory_human_review is True
     assert any("No clinical symptoms" in t for t in res.review_triggers)
 
@@ -222,21 +223,21 @@ def test_handle_multiple_patients():
 
 
 def test_handle_unknown_emergency():
-    """Unknown emergency type must map to UNKNOWN + ALS + mandatory human review."""
+    """Unknown emergency type must map to UNKNOWN + UNKNOWN + mandatory human review."""
     extraction = EmergencyExtractionResult(
         emergency_type="Unknown",
         symptoms=[],
         severity=SeverityLevel.UNKNOWN,
-        ambulance_requirement=AmbulanceType.ALS,
+        ambulance_requirement=AmbulanceType.UNKNOWN,
     )
     res = evaluate_hybrid_triage(extraction, "Unknown emergency reported")
     assert res.final_severity == SeverityLevel.UNKNOWN
-    assert res.final_ambulance == AmbulanceType.ALS
+    assert res.final_ambulance == AmbulanceType.UNKNOWN
     assert res.mandatory_human_review is True
 
 
 def test_handle_vague_emergency():
-    """Short vague emergency calls without clinical signs map to UNKNOWN + ALS."""
+    """Short vague emergency calls without clinical signs map to UNKNOWN + UNKNOWN."""
     extraction = EmergencyExtractionResult(
         emergency_type="General Medical Emergency",
         symptoms=["reported distress"],
@@ -245,8 +246,9 @@ def test_handle_vague_emergency():
     )
     res = evaluate_hybrid_triage(extraction, "Please help quickly")
     assert res.final_severity == SeverityLevel.UNKNOWN
-    assert res.final_ambulance == AmbulanceType.ALS
+    assert res.final_ambulance == AmbulanceType.UNKNOWN
     assert res.mandatory_human_review is True
+
 
 
 def test_handle_conflicting_llm_rule_output():

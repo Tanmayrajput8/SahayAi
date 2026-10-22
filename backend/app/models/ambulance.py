@@ -10,6 +10,7 @@ from app.models.case import AmbulanceType
 class AmbulanceStatus(str, enum.Enum):
     AVAILABLE = "AVAILABLE"
     DISPATCHED = "DISPATCHED"
+    ARRIVED = "ARRIVED"
     BUSY = "BUSY"
     MAINTENANCE = "MAINTENANCE"
 
@@ -30,3 +31,11 @@ class Ambulance(Base, TimestampMixin):
 
     # Relationships
     resource_matches = relationship("ResourceMatch", back_populates="ambulance")
+
+    @property
+    def assigned_case_id(self) -> Optional[str]:
+        if self.resource_matches:
+            for rm in reversed(self.resource_matches):
+                if getattr(rm, "is_dispatched", False):
+                    return rm.case_id
+        return None

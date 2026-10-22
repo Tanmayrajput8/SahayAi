@@ -38,18 +38,26 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
-    # AI & LLM Providers (Grok / xAI REST API + Mock Provider)
-    LLM_PROVIDER: str = "mock"  # "grok" or "mock"
+    # AI & LLM Providers (Groq Cloud LLM / Grok / xAI REST API + Mock Provider)
+    LLM_PROVIDER: str = "groq"  # "groq", "grok", or "mock"
+    GROQ_API_KEY: str = ""
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    GROQ_API_URL: str = "https://api.groq.com/openai/v1/chat/completions"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
     GROK_API_KEY: str = ""
     GROK_BASE_URL: str = "https://api.x.ai/v1"
     GROK_API_URL: str = "https://api.x.ai/v1/chat/completions"
     GROK_MODEL: str = "grok-4.6"
-    LLM_TIMEOUT_SECONDS: float = 15.0
+    LLM_TIMEOUT_SECONDS: float = 20.0
     LLM_MAX_RETRIES: int = 2
-    MOCK_MODE: bool = True
+    MOCK_MODE: bool = False
 
-    # Speech-to-Text Providers (Groq Whisper Large v3 REST API / Mock Provider)
-    SPEECH_PROVIDER: str = "mock"  # "external" or "mock"
+    # Speech-to-Text Providers (Sarvam AI Saaras / Groq Whisper / Mock Provider)
+    SPEECH_PROVIDER: str = "sarvam"  # "sarvam", "groq", "external", or "mock"
+    SARVAM_API_KEY: str = ""
+    SARVAM_STT_MODEL: str = "saaras:v4"
+    SARVAM_STT_URL: str = "https://api.sarvam.ai/speech-to-text"
+    SARVAM_TIMEOUT_SECONDS: float = 20.0
     STT_API_KEY: str = ""
     STT_API_URL: str = "https://api.groq.com/openai/v1/audio/transcriptions"
     STT_MODEL: str = "whisper-large-v3"
@@ -90,6 +98,16 @@ class Settings(BaseSettings):
         "rag",
         "knowledge_base",
     )
+
+    # Duplicate Detection Multi-Signal System Settings
+    DUPLICATE_SEMANTIC_WEIGHT: float = 0.40
+    DUPLICATE_LOCATION_WEIGHT: float = 0.30
+    DUPLICATE_TIME_WEIGHT: float = 0.15
+    DUPLICATE_TYPE_WEIGHT: float = 0.15
+    DUPLICATE_THRESHOLD: float = 0.80
+    DUPLICATE_POSSIBLE_THRESHOLD: float = 0.60
+    DUPLICATE_TIME_WINDOW_MINUTES: float = 120.0
+    DUPLICATE_LOCATION_RADIUS_KM: float = 5.0
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),

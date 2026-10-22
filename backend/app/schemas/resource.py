@@ -15,6 +15,8 @@ class AmbulanceResponse(BaseModel):
     equipment: List[str] = []
     contact_number: Optional[str] = None
     driver_name: Optional[str] = None
+    # Populated by API layer from latest active resource_match — used by citizen tracking
+    assigned_case_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

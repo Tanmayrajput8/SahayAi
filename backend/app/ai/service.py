@@ -11,12 +11,13 @@ from app.models.human_review import HumanReview, ReviewStatus
 from app.models.audit import AuditLog, AuditStage
 from app.models.verification import VerificationResult, VerificationStatus
 from app.models.duplicate import DuplicateRelationship
-from app.models.location import GeocodingStatus
+from app.models.location import Location, GeocodingStatus
 from app.ai.providers.base import LLMProvider
 from app.ai.providers.factory import get_llm_provider
 from app.ai.schemas import EmergencyExtractionResult
 from app.ai.triage_engine import evaluate_hybrid_triage
 from app.ai.geocoding import process_case_geocoding, GeocodingProvider
+from app.services.duplicate_detection import run_duplicate_detection, DuplicateState
 
 logger = logging.getLogger(__name__)
 
@@ -145,52 +146,22 @@ def process_case_extraction(
         # 6. Geocoding & Spatial Resolution (OpenStreetMap Nominatim / GeocodingProvider)
         # Note: If geocoding fails or is ambiguous, the emergency is NEVER rejected.
         # It is marked unverified, surfaces in HumanReview for dispatcher intervention, and logs an audit trail.
+        loc_query = result.location
+        if not loc_query and case.location and case.location.raw_query and case.location.raw_query != "[Location Not Mentioned]":
+            loc_query = case.location.raw_query
+
         loc, geo_review_trigger = process_case_geocoding(
             case=case,
-            location_query=result.location,
+            location_query=loc_query,
             db=db,
             provider=geocoding_provider,
         )
 
-        # 7. Duplicate Detection Check
-        detected_duplicate = False
-        if result.location:
-            candidate_case = (
-                db.query(Case)
-                .join(ExtractedInfo, ExtractedInfo.case_id == Case.id)
-                .filter(
-                    Case.id != case.id,
-                    ExtractedInfo.extracted_location_text.ilike(f"%{result.location}%"),
-                    ExtractedInfo.emergency_type == result.emergency_type,
-                )
-                .order_by(Case.created_at.desc())
-                .first()
-            )
-            if candidate_case:
-                detected_duplicate = True
-                dup_rel = DuplicateRelationship(
-                    primary_case_id=candidate_case.id,
-                    duplicate_case_id=case.id,
-                    semantic_similarity=0.88,
-                    geographic_distance_km=0.1,
-                    temporal_diff_minutes=5.0,
-                    overall_confidence=0.85,
-                    is_confirmed_duplicate=False,
-                    detection_method="SEMANTIC_SPATIAL_CLUSTER",
-                )
-                db.add(dup_rel)
-
-        audit_dup = AuditLog(
-            case_id=case.id,
-            stage=AuditStage.DUPLICATE_CHECK,
-            actor="DUPLICATE_DETECTOR",
-            action="DUPLICATE_CHECK_COMPLETED",
-            details={
-                "duplicate_detected": detected_duplicate,
-                "searched_location": result.location,
-            },
-        )
-        db.add(audit_dup)
+        # 7. Real Multi-Signal Duplicate Detection Check
+        # Uses real semantic cosine similarity, Haversine geographic distance,
+        # temporal decay within candidate window, and normalized emergency taxonomy.
+        dup_result = run_duplicate_detection(case=case, db=db)
+        detected_duplicate = dup_result.duplicate_detected
 
         # 8. Human Review Routing Logic (Human-in-the-Loop)
         needs_review = (
@@ -202,6 +173,7 @@ def process_case_extraction(
             or ("exact location / landmark" in result.missing_information and hybrid.final_severity in (SeverityLevel.CRITICAL, SeverityLevel.HIGH))
             or (geo_review_trigger is not None)
             or (loc is not None and not loc.is_verified)
+            or dup_result.requires_human_review
         )
 
         if needs_review:
@@ -217,8 +189,10 @@ def process_case_extraction(
                 reasons.append(f"Contradictory caller report: {result.contradiction_notes or 'inconsistent states'}")
             if result.missing_information:
                 reasons.append(f"Missing critical items: {', '.join(result.missing_information)}")
-            if detected_duplicate:
-                reasons.append("Potential duplicate incident detected at same location")
+            if dup_result.requires_human_review and dup_result.review_trigger_reason:
+                reasons.append(dup_result.review_trigger_reason)
+            elif detected_duplicate:
+                reasons.append(f"Potential duplicate incident detected (Score: {dup_result.duplicate_score:.2f})")
 
             review = HumanReview(
                 case_id=case.id,
@@ -236,6 +210,9 @@ def process_case_extraction(
                     "deterministic_ambulance": hybrid.deterministic_ambulance.value,
                     "has_conflict": hybrid.has_conflict,
                     "is_duplicate_candidate": detected_duplicate,
+                    "duplicate_score": dup_result.duplicate_score,
+                    "duplicate_status": dup_result.state.value,
+                    "duplicate_matched_case_id": dup_result.best_candidate_id,
                     "disclaimer": hybrid.disclaimer,
                 },
             )
@@ -334,16 +311,34 @@ def process_case_extraction(
         )
         db.add(audit)
 
-        # 5. Geocoding Fallback: Ensure location record exists and is marked unverified/failed
+        # 5. Geocoding Fallback: Mark location as failed (do NOT send raw_text to geocoder!)
+        # Only extract AI-identified location text for geocoding. If LLM failed, we have no
+        # reliable location to geocode. Mark unverified so dispatcher can intervene.
         try:
-            process_case_geocoding(
-                case=case,
-                location_query=case.raw_text,
-                db=db,
-                provider=geocoding_provider,
+            existing_loc = case.location or db.query(Location).filter(Location.case_id == case.id).first()
+            if not existing_loc:
+                existing_loc = Location(
+                    case=case,
+                    case_id=case.id,
+                    raw_query="[Location extraction failed - LLM unavailable]",
+                    status=GeocodingStatus.FAILED,
+                    is_verified=False,
+                    confidence=0.0,
+                    geocoding_provider="none",
+                    error_message="LLM extraction failed before location could be identified. Dispatcher must set coordinates manually.",
+                )
+                case.location = existing_loc
+                db.add(existing_loc)
+            audit_loc = AuditLog(
+                case_id=case.id,
+                stage=AuditStage.GEOCODING,
+                actor="GEOCODER_FALLBACK",
+                action="GEOCODING_SKIPPED_LLM_FAILURE",
+                details={"reason": "LLM extraction failed; raw_text NOT sent to geocoder to prevent false geocoding. Dispatcher intervention required."},
             )
+            db.add(audit_loc)
         except Exception as geo_exc:
-            logger.warning("Fallback geocoding on extraction error encountered: %s", geo_exc)
+            logger.warning("Location failure marking failed: %s", geo_exc)
 
     db.commit()
     db.refresh(case)

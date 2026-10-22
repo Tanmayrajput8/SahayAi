@@ -62,7 +62,7 @@ class Location(Base, TimestampMixin):
 
     @property
     def location_text(self) -> str:
-        return str(self.raw_query or "")
+        return (self.raw_query or "")
 
     @location_text.setter
     def location_text(self, val: str):
@@ -70,7 +70,7 @@ class Location(Base, TimestampMixin):
 
     @property
     def provider(self) -> str:
-        return str(self.geocoding_provider or "")
+        return (self.geocoding_provider or "")
 
     @provider.setter
     def provider(self, val: str):

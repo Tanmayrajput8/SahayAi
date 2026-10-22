@@ -107,3 +107,85 @@ def test_staff_authentication_and_protected_access():
     assert me_resp.status_code == 200
     assert me_resp.json()["username"] == "dispatcher1"
     assert me_resp.json()["role"] == "dispatcher"
+
+
+def test_full_lifecycle_under_review_to_dispatched_arrived_completed():
+    """
+    Validates complete workflow:
+    Citizen reports emergency -> AI triage -> UNDER_REVIEW ->
+    Staff opens case & reviews AI/deterministic -> CLICK DISPATCH ->
+    Backend assigns ambulance -> Database updated -> Audit recorded ->
+    DISPATCHED/EN ROUTE -> Citizen page updates (Ambulance + ETA + map + Hospital) ->
+    ARRIVED -> COMPLETED.
+    """
+    # 1. Citizen reports emergency
+    create_resp = client.post("/api/v1/cases", json={
+        "raw_text": "Pedestrian hit near bus stop in Pune, leg fracture, bleeding",
+        "manual_location": "bus stop Pune",
+        "latitude": 18.5204,
+        "longitude": 73.8567,
+        "language": "english",
+    })
+    assert create_resp.status_code == 201
+    case_id = create_resp.json()["id"]
+
+    # 2. AI clinical triage extraction
+    triage_resp = client.post(f"/api/v1/cases/{case_id}/triage")
+    assert triage_resp.status_code == 200
+
+    # 3. Place case UNDER_REVIEW (as occurs when automated intake flags uncertainty or review)
+    client.patch(f"/api/v1/cases/{case_id}/status", json={
+        "status": "UNDER_REVIEW",
+        "notes": "Queued for supervisor dispatcher review",
+    })
+
+    # 4. Staff opens same case
+    staff_view = client.get(f"/api/v1/cases/{case_id}")
+    assert staff_view.status_code == 200
+    staff_case = staff_view.json()
+    assert staff_case["status"] == "UNDER_REVIEW"
+
+    # 5. Staff reviews AI + deterministic result & confidence
+    conf_resp = client.get(f"/api/v1/review/{case_id}/confidence")
+    assert conf_resp.status_code == 200
+
+    # 6. Staff CLICKS "DISPATCH" (manual authorization)
+    dispatch_resp = client.post(f"/api/v1/cases/{case_id}/dispatch?manual=true&dispatcher_id=dispatcher1")
+    assert dispatch_resp.status_code == 200
+    disp_result = dispatch_resp.json()
+    assert disp_result["is_dispatched"] is True
+    assert disp_result["matched_ambulance"] is not None
+    assert disp_result["matched_hospital"] is not None
+    amb_num = disp_result["matched_ambulance"]["vehicle_number"]
+
+    # 7. Database updated -> Case status is DISPATCHED
+    # 8. Staff page & Citizen page reflect DISPATCHED / EN ROUTE
+    # 9. Citizen page receives assigned ambulance, ETA, and hospital
+    updated_case = client.get(f"/api/v1/cases/{case_id}").json()
+    assert updated_case["status"] == "DISPATCHED"
+    assert updated_case["assigned_ambulance"]["vehicle_number"] == amb_num
+    assert updated_case["assigned_hospital"] is not None
+    assert updated_case["eta_minutes"] is not None
+
+    # 10. Audit recorded
+    timeline_resp = client.get(f"/api/v1/audit/cases/{case_id}/timeline")
+    assert timeline_resp.status_code == 200
+    timeline = timeline_resp.json()
+    dispatch_actions = [e["action"] for e in timeline]
+    assert any("DISPATCH" in a for a in dispatch_actions)
+
+    # 11. ARRIVED at scene
+    arrived_resp = client.patch(f"/api/v1/cases/{case_id}/status", json={
+        "status": "ARRIVED",
+        "notes": "Ambulance arrived at incident scene",
+    })
+    assert arrived_resp.status_code == 200
+    assert arrived_resp.json()["status"] == "ARRIVED"
+
+    # 12. COMPLETED / RESOLVED
+    resolved_resp = client.patch(f"/api/v1/cases/{case_id}/status", json={
+        "status": "RESOLVED",
+        "notes": "Patient transferred to hospital emergency department",
+    })
+    assert resolved_resp.status_code == 200
+    assert resolved_resp.json()["status"] == "RESOLVED"

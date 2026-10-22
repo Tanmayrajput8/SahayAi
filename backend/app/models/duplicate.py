@@ -14,9 +14,10 @@ class DuplicateRelationship(Base, TimestampMixin):
     semantic_similarity: Mapped[float] = mapped_column(Float, default=0.0)      # Vector / text similarity (0-1)
     geographic_distance_km: Mapped[float] = mapped_column(Float, default=0.0)   # Distance in km
     temporal_diff_minutes: Mapped[float] = mapped_column(Float, default=0.0)    # Time difference in minutes
+    emergency_type_similarity: Mapped[float] = mapped_column(Float, default=0.0) # Clinical taxonomy similarity (0-1)
     overall_confidence: Mapped[float] = mapped_column(Float, default=0.0)       # Combined duplicate score
     is_confirmed_duplicate: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    detection_method: Mapped[str] = mapped_column(String(64), default="HYBRID_MULTIFACTOR")
+    detection_method: Mapped[str] = mapped_column(String(64), default="WEIGHTED_MULTISIGNAL")
 
     # Relationships
     primary_case = relationship("Case", foreign_keys=[primary_case_id], back_populates="duplicate_associations")
